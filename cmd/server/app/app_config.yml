@@ -1,13 +1,13 @@
 additionalProperties:
-  key:    #应用的 key ，仅限英文，用于在 Linux 创建文件夹
-  name:   #应用名称
+  key:    # The application's key, limited to English, used to create a folder in Linux
+  name:   # Application name
   tags:
-    - Tool #应用标签，可以有多个，请参照下方的标签列表
-  shortDescZh:  #应用中文描述，不要超过30个字
-  shortDescEn:  #应用英文描述
-  type: tool  #应用类型，区别于应用分类，只能有一个，请参照下方的类型列表
-  crossVersionUpdate:   #是否可以跨大版本升级
-  limit:  #应用安装数量限制，0 代表无限制
-  website:  #官网地址
-  github:  #github 地址
-  document:  #文档地址
+    - Tool # Application tags, multiple tags are allowed. Refer to the tag list below
+  shortDescZh:  # Application description in Chinese, no more than 30 characters
+  shortDescEn:  # Application description in English
+  type: tool  # Application type, different from application category, only one is allowed. Refer to the type list below
+  crossVersionUpdate:   # Whether cross-major-version upgrades are supported
+  limit:  # Application installation limit, 0 means no limit
+  website:  # Official website address
+  github:  # GitHub address
+  document:  # Documentation address

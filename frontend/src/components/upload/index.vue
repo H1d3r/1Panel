@@ -1,6 +1,12 @@
 <template>
     <div>
-        <el-drawer v-model="upVisible" :destroy-on-close="true" :close-on-click-modal="false" size="50%">
+        <el-drawer
+            v-model="upVisible"
+            :destroy-on-close="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            size="50%"
+        >
             <template #header>
                 <DrawerHeader :header="$t('commons.button.import')" :resource="title" :back="handleClose" />
             </template>
@@ -8,7 +14,18 @@
                 <div class="mb-4" v-if="type === 'mysql' || type === 'mariadb'">
                     <el-alert type="error" :title="$t('database.formatHelper', [remark])" />
                 </div>
-                <el-upload ref="uploadRef" drag :on-change="fileOnChange" class="upload-demo" :auto-upload="false">
+                <div class="mb-4" v-if="type === 'website'">
+                    <el-alert :closable="false" type="warning" :title="$t('website.websiteBackupWarn')"></el-alert>
+                </div>
+                <el-upload
+                    :limit="1"
+                    ref="uploadRef"
+                    drag
+                    :on-exceed="handleExceed"
+                    :on-change="fileOnChange"
+                    class="upload-demo"
+                    :auto-upload="false"
+                >
                     <el-icon class="el-icon--upload"><upload-filled /></el-icon>
                     <div class="el-upload__text">
                         {{ $t('database.dropHelper') }}
@@ -39,7 +56,7 @@
                         </div>
                     </template>
                 </el-upload>
-                <el-button :disabled="isUpload" v-if="uploaderFiles.length === 1" icon="Upload" @click="onSubmit">
+                <el-button :disabled="isUpload || uploaderFiles.length !== 1" icon="Upload" @click="onSubmit">
                     {{ $t('commons.button.upload') }}
                 </el-button>
 
@@ -83,6 +100,34 @@
             </div>
         </el-drawer>
 
+        <el-dialog
+            v-model="open"
+            :title="$t('commons.button.recover') + ' - ' + name"
+            width="40%"
+            :close-on-click-modal="false"
+            :before-close="handleBackupClose"
+        >
+            <el-form ref="backupForm" label-position="left" v-loading="loading">
+                <el-form-item
+                    :label="$t('setting.compressPassword')"
+                    style="margin-top: 10px"
+                    v-if="type === 'app' || type === 'website'"
+                >
+                    <el-input v-model="secret" :placeholder="$t('setting.backupRecoverMessage')" />
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <span class="dialog-footer">
+                    <el-button @click="handleBackupClose" :disabled="loading">
+                        {{ $t('commons.button.cancel') }}
+                    </el-button>
+                    <el-button type="primary" @click="onHandleRecover" :disabled="loading">
+                        {{ $t('commons.button.confirm') }}
+                    </el-button>
+                </span>
+            </template>
+        </el-dialog>
+
         <OpDialog ref="opRef" @search="search" />
     </div>
 </template>
@@ -90,13 +135,12 @@
 <script lang="ts" setup>
 import { reactive, ref } from 'vue';
 import { computeSize } from '@/utils/util';
-import { handleRecoverByUpload } from '@/api/modules/setting';
 import i18n from '@/lang';
-import { UploadFile, UploadFiles, UploadInstance } from 'element-plus';
+import { UploadFile, UploadFiles, UploadInstance, UploadProps, UploadRawFile, genFileId } from 'element-plus';
 import { File } from '@/api/interface/file';
 import DrawerHeader from '@/components/drawer-header/index.vue';
 import { BatchDeleteFile, CheckFile, ChunkUploadFileData, GetUploadList } from '@/api/modules/files';
-import { loadBaseDir } from '@/api/modules/setting';
+import { handleRecoverByUpload, loadBaseDir } from '@/api/modules/setting';
 import { MsgError, MsgSuccess } from '@/utils/message';
 
 const loading = ref();
@@ -106,10 +150,12 @@ const selects = ref<any>([]);
 const baseDir = ref();
 const opRef = ref();
 
+const open = ref();
+const currentRow = ref();
+
 const data = ref();
 const title = ref();
 const paginationConfig = reactive({
-    cacheSizeKey: 'upload-page-size',
     currentPage: 1,
     pageSize: 10,
     total: 0,
@@ -120,6 +166,7 @@ const type = ref();
 const name = ref();
 const detailName = ref();
 const remark = ref();
+const secret = ref();
 interface DialogProps {
     type: string;
     name: string;
@@ -146,11 +193,11 @@ const acceptParams = async (params: DialogProps): Promise<void> => {
             break;
         case 'website':
             title.value = name.value;
-            baseDir.value = `${pathRes.data}/uploads/database/${type.value}/${detailName.value}/`;
+            baseDir.value = `${pathRes.data}/uploads/website/${type.value}/${detailName.value}/`;
             break;
         case 'app':
             title.value = name.value;
-            baseDir.value = `${pathRes.data}/uploads/database/${type.value}/${name.value}/`;
+            baseDir.value = `${pathRes.data}/uploads/app/${type.value}/${name.value}/`;
     }
     upVisible.value = true;
     search();
@@ -168,31 +215,48 @@ const search = async () => {
 };
 
 const onRecover = async (row: File.File) => {
-    ElMessageBox.confirm(
-        i18n.global.t('commons.msg.recoverHelper', [row.name]),
-        i18n.global.t('commons.button.recover'),
-        {
-            confirmButtonText: i18n.global.t('commons.button.confirm'),
-            cancelButtonText: i18n.global.t('commons.button.cancel'),
-        },
-    ).then(async () => {
-        let params = {
-            source: 'LOCAL',
-            type: type.value,
-            name: name.value,
-            detailName: detailName.value,
-            file: baseDir.value + row.name,
-        };
-        loading.value = true;
-        await handleRecoverByUpload(params)
-            .then(() => {
-                loading.value = false;
-                MsgSuccess(i18n.global.t('commons.msg.operationSuccess'));
-            })
-            .catch(() => {
-                loading.value = false;
-            });
-    });
+    currentRow.value = row;
+    if (type.value !== 'app' && type.value !== 'website') {
+        ElMessageBox.confirm(
+            i18n.global.t('commons.msg.recoverHelper', [row.name]),
+            i18n.global.t('commons.button.recover'),
+            {
+                confirmButtonText: i18n.global.t('commons.button.confirm'),
+                cancelButtonText: i18n.global.t('commons.button.cancel'),
+            },
+        ).then(async () => {
+            onHandleRecover();
+        });
+        return;
+    }
+    open.value = true;
+};
+
+const handleBackupClose = () => {
+    open.value = false;
+};
+const onHandleRecover = async () => {
+    let params = {
+        source: 'LOCAL',
+        type: type.value,
+        name: name.value,
+        detailName: detailName.value,
+        file: baseDir.value + currentRow.value.name,
+        secret: secret.value,
+        recoverType: 'upload',
+    };
+    loading.value = true;
+    await handleRecoverByUpload(params)
+        .then(() => {
+            loading.value = false;
+            handleClose();
+            handleBackupClose();
+            MsgSuccess(i18n.global.t('commons.msg.operationSuccess'));
+            search();
+        })
+        .catch(() => {
+            loading.value = false;
+        });
 };
 
 const uploaderFiles = ref<UploadFiles>([]);
@@ -221,6 +285,13 @@ const handleClose = () => {
     uploaderFiles.value = [];
     uploadRef.value!.clearFiles();
     upVisible.value = false;
+};
+
+const handleExceed: UploadProps['onExceed'] = (files) => {
+    uploadRef.value!.clearFiles();
+    const file = files[0] as UploadRawFile;
+    file.uid = genFileId();
+    uploadRef.value!.handleStart(file);
 };
 
 const onSubmit = async () => {

@@ -1,6 +1,6 @@
 <template>
     <div>
-        <LayoutContent v-loading="loading" :title="$t('ssh.loginLogs')">
+        <LayoutContent v-loading="loading" :title="'SSH ' + $t('ssh.loginLogs', 2)">
             <template #prompt>
                 <el-alert type="info" :title="$t('ssh.sshAlert2')" :closable="false" />
                 <div class="mt-2"><el-alert type="info" :title="$t('ssh.sshAlert')" :closable="false" /></div>
@@ -14,13 +14,13 @@
                 </el-select>
             </template>
             <template #toolbar>
-                <el-row>
-                    <el-col :xs="24" :sm="16" :md="16" :lg="16" :xl="16"></el-col>
-                    <el-col :xs="24" :sm="8" :md="8" :lg="8" :xl="8">
+                <div class="flex justify-between gap-2 flex-wrap sm:flex-row">
+                    <div><!-- 占位 --></div>
+                    <div class="flex flex-wrap gap-3">
                         <TableSetting @search="search()" />
                         <TableSearch @search="search()" v-model:searchName="searchInfo" />
-                    </el-col>
-                </el-row>
+                    </div>
+                </div>
             </template>
 
             <template #main>
@@ -60,7 +60,7 @@
 
 <script setup lang="ts">
 import { dateFormat } from '@/utils/util';
-import { onMounted, reactive, ref } from '@vue/runtime-core';
+import { onMounted, reactive, ref } from 'vue';
 import { loadSSHLogs } from '@/api/modules/host';
 
 const loading = ref();

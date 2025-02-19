@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/1Panel-dev/1Panel/backend/app/dto"
+	"github.com/1Panel-dev/1Panel/backend/app/service"
 	"github.com/1Panel-dev/1Panel/backend/global"
 	"github.com/1Panel-dev/1Panel/backend/utils/cmd"
 	"github.com/1Panel-dev/1Panel/backend/utils/copier"
@@ -78,6 +80,13 @@ func (b *BaseApi) RedisWsSsh(c *gin.Context) {
 		global.LOG.Errorf("gin context http handler failed, err: %v", err)
 		return
 	}
+	defer wsConn.Close()
+
+	if global.CONF.System.IsDemo {
+		if wshandleError(wsConn, errors.New("   demo server, prohibit this operation!")) {
+			return
+		}
+	}
 
 	cols, err := strconv.Atoi(c.DefaultQuery("cols", "80"))
 	if wshandleError(wsConn, errors.WithMessage(err, "invalid param cols in request")) {
@@ -87,22 +96,102 @@ func (b *BaseApi) RedisWsSsh(c *gin.Context) {
 	if wshandleError(wsConn, errors.WithMessage(err, "invalid param rows in request")) {
 		return
 	}
-	redisConf, err := redisService.LoadConf()
-	if wshandleError(wsConn, errors.WithMessage(err, "load redis container failed")) {
+	name := c.Query("name")
+	from := c.Query("from")
+	commands := []string{"redis-cli"}
+	database, err := databaseService.Get(name)
+	if wshandleError(wsConn, errors.WithMessage(err, "no such database in db")) {
 		return
 	}
-
-	defer wsConn.Close()
-	commands := "redis-cli"
-	if len(redisConf.Requirepass) != 0 {
-		commands = fmt.Sprintf("redis-cli -a %s --no-auth-warning", redisConf.Requirepass)
+	if from == "local" {
+		redisInfo, err := appInstallService.LoadConnInfo(dto.OperationWithNameAndType{Name: name, Type: "redis"})
+		if wshandleError(wsConn, errors.WithMessage(err, "no such database in db")) {
+			return
+		}
+		name = redisInfo.ContainerName
+		if len(database.Password) != 0 {
+			commands = []string{"redis-cli", "-a", database.Password, "--no-auth-warning"}
+		}
+	} else {
+		itemPort := fmt.Sprintf("%v", database.Port)
+		commands = []string{"redis-cli", "-h", database.Address, "-p", itemPort}
+		if len(database.Password) != 0 {
+			commands = []string{"redis-cli", "-h", database.Address, "-p", itemPort, "-a", database.Password, "--no-auth-warning"}
+		}
+		name = "1Panel-redis-cli-tools"
 	}
-	pidMap := loadMapFromDockerTop(redisConf.ContainerName)
-	slave, err := terminal.NewCommand(fmt.Sprintf("docker exec -it %s %s", redisConf.ContainerName, commands))
+
+	pidMap := loadMapFromDockerTop(name)
+	itemCmds := append([]string{"exec", "-it", name}, commands...)
+	slave, err := terminal.NewCommand(itemCmds)
 	if wshandleError(wsConn, err) {
 		return
 	}
-	defer killBash(redisConf.ContainerName, pidMap)
+	defer killBash(name, strings.Join(commands, " "), pidMap)
+	defer slave.Close()
+
+	tty, err := terminal.NewLocalWsSession(cols, rows, wsConn, slave, false)
+	if wshandleError(wsConn, err) {
+		return
+	}
+
+	quitChan := make(chan bool, 3)
+	tty.Start(quitChan)
+	go slave.Wait(quitChan)
+
+	<-quitChan
+
+	global.LOG.Info("websocket finished")
+	if wshandleError(wsConn, err) {
+		return
+	}
+}
+
+func (b *BaseApi) OllamaWsSsh(c *gin.Context) {
+	wsConn, err := upGrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		global.LOG.Errorf("gin context http handler failed, err: %v", err)
+		return
+	}
+	defer wsConn.Close()
+
+	if global.CONF.System.IsDemo {
+		if wshandleError(wsConn, errors.New("   demo server, prohibit this operation!")) {
+			return
+		}
+	}
+
+	cols, err := strconv.Atoi(c.DefaultQuery("cols", "80"))
+	if wshandleError(wsConn, errors.WithMessage(err, "invalid param cols in request")) {
+		return
+	}
+	rows, err := strconv.Atoi(c.DefaultQuery("rows", "40"))
+	if wshandleError(wsConn, errors.WithMessage(err, "invalid param rows in request")) {
+		return
+	}
+	name := c.Query("name")
+	if cmd.CheckIllegal(name) {
+		if wshandleError(wsConn, errors.New("  The command contains illegal characters.")) {
+			return
+		}
+	}
+	container, err := service.LoadContainerName()
+	if wshandleError(wsConn, errors.WithMessage(err, "  load container name for ollama failed")) {
+		return
+	}
+	commands := []string{"ollama", "run", name}
+
+	pidMap := loadMapFromDockerTop(container)
+	fmt.Println("pidMap")
+	for k, v := range pidMap {
+		fmt.Println(k, v)
+	}
+	itemCmds := append([]string{"exec", "-it", container}, commands...)
+	slave, err := terminal.NewCommand(itemCmds)
+	if wshandleError(wsConn, err) {
+		return
+	}
+	defer killBash(container, strings.Join(commands, " "), pidMap)
 	defer slave.Close()
 
 	tty, err := terminal.NewLocalWsSession(cols, rows, wsConn, slave, false)
@@ -129,6 +218,12 @@ func (b *BaseApi) ContainerWsSsh(c *gin.Context) {
 		return
 	}
 	defer wsConn.Close()
+
+	if global.CONF.System.IsDemo {
+		if wshandleError(wsConn, errors.New("   demo server, prohibit this operation!")) {
+			return
+		}
+	}
 
 	containerID := c.Query("containerid")
 	command := c.Query("command")
@@ -161,16 +256,16 @@ func (b *BaseApi) ContainerWsSsh(c *gin.Context) {
 		return
 	}
 
-	commands := fmt.Sprintf("docker exec -it %s %s", containerID, command)
+	commands := []string{"exec", "-it", containerID, command}
 	if len(user) != 0 {
-		commands = fmt.Sprintf("docker exec -it -u %s %s %s", user, containerID, command)
+		commands = []string{"exec", "-it", "-u", user, containerID, command}
 	}
 	pidMap := loadMapFromDockerTop(containerID)
 	slave, err := terminal.NewCommand(commands)
 	if wshandleError(wsConn, err) {
 		return
 	}
-	defer killBash(containerID, pidMap)
+	defer killBash(containerID, command, pidMap)
 	defer slave.Close()
 
 	tty, err := terminal.NewLocalWsSession(cols, rows, wsConn, slave, true)
@@ -221,26 +316,26 @@ func loadMapFromDockerTop(containerID string) map[string]string {
 	lines := strings.Split(stdout, "\n")
 	for _, line := range lines {
 		parts := strings.Fields(line)
-		if len(parts) == 0 {
+		if len(parts) < 2 {
 			continue
 		}
-		pidMap[parts[0]] = strings.Join(parts, " ")
+		pidMap[parts[0]] = strings.Join(parts[1:], " ")
 	}
 	return pidMap
 }
 
-func killBash(containerID string, pidMap map[string]string) {
+func killBash(containerID, comm string, pidMap map[string]string) {
 	sudo := cmd.SudoHandleCmd()
 	newPidMap := loadMapFromDockerTop(containerID)
-	for pid, newCmd := range newPidMap {
+	for pid, command := range newPidMap {
 		isOld := false
-		for pid2, oldCmd := range pidMap {
-			if pid == pid2 && oldCmd == newCmd {
+		for pid2 := range pidMap {
+			if pid == pid2 {
 				isOld = true
 				break
 			}
 		}
-		if !isOld {
+		if !isOld && command == comm {
 			_, _ = cmd.Execf("%s kill -9 %s", sudo, pid)
 		}
 	}

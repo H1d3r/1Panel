@@ -2,6 +2,7 @@ package service
 
 import (
 	"github.com/1Panel-dev/1Panel/backend/app/dto"
+	"github.com/1Panel-dev/1Panel/backend/app/model"
 	"github.com/1Panel-dev/1Panel/backend/constant"
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
@@ -16,6 +17,11 @@ type ICommandService interface {
 	Create(commandDto dto.CommandOperate) error
 	Update(id uint, upMap map[string]interface{}) error
 	Delete(ids []uint) error
+
+	SearchRedisCommandWithPage(search dto.SearchWithPage) (int64, interface{}, error)
+	ListRedisCommand() ([]dto.RedisCommand, error)
+	SaveRedisCommand(commandDto dto.RedisCommand) error
+	DeleteRedisCommand(ids []uint) error
 }
 
 func NewICommandService() ICommandService {
@@ -65,7 +71,7 @@ func (u *CommandService) SearchForTree() ([]dto.CommandTree, error) {
 }
 
 func (u *CommandService) SearchWithPage(search dto.SearchCommandWithPage) (int64, interface{}, error) {
-	total, commands, err := commandRepo.Page(search.Page, search.PageSize, commonRepo.WithLikeName(search.Info), commonRepo.WithByGroupID(search.GroupID), commonRepo.WithOrderRuleBy(search.OrderBy, search.Order))
+	total, commands, err := commandRepo.Page(search.Page, search.PageSize, commandRepo.WithLikeName(search.Name), commonRepo.WithLikeName(search.Info), commonRepo.WithByGroupID(search.GroupID), commonRepo.WithOrderRuleBy(search.OrderBy, search.Order))
 	if err != nil {
 		return 0, nil, err
 	}
@@ -114,4 +120,64 @@ func (u *CommandService) Delete(ids []uint) error {
 
 func (u *CommandService) Update(id uint, upMap map[string]interface{}) error {
 	return commandRepo.Update(id, upMap)
+}
+
+func (u *CommandService) SearchRedisCommandWithPage(search dto.SearchWithPage) (int64, interface{}, error) {
+	total, commands, err := commandRepo.PageRedis(search.Page, search.PageSize, commandRepo.WithLikeName(search.Info))
+	if err != nil {
+		return 0, nil, err
+	}
+	var dtoCommands []dto.RedisCommand
+	for _, command := range commands {
+		var item dto.RedisCommand
+		if err := copier.Copy(&item, &command); err != nil {
+			return 0, nil, errors.WithMessage(constant.ErrStructTransform, err.Error())
+		}
+		dtoCommands = append(dtoCommands, item)
+	}
+	return total, dtoCommands, err
+}
+
+func (u *CommandService) ListRedisCommand() ([]dto.RedisCommand, error) {
+	commands, err := commandRepo.GetRedisList()
+	if err != nil {
+		return nil, constant.ErrRecordNotFound
+	}
+	var dtoCommands []dto.RedisCommand
+	for _, command := range commands {
+		var item dto.RedisCommand
+		if err := copier.Copy(&item, &command); err != nil {
+			return nil, errors.WithMessage(constant.ErrStructTransform, err.Error())
+		}
+		dtoCommands = append(dtoCommands, item)
+	}
+	return dtoCommands, err
+}
+
+func (u *CommandService) SaveRedisCommand(req dto.RedisCommand) error {
+	if req.ID == 0 {
+		command, _ := commandRepo.GetRedis(commonRepo.WithByName(req.Name))
+		if command.ID != 0 {
+			return constant.ErrRecordExist
+		}
+	}
+	var command model.RedisCommand
+	if err := copier.Copy(&command, &req); err != nil {
+		return errors.WithMessage(constant.ErrStructTransform, err.Error())
+	}
+	if err := commandRepo.SaveRedis(&command); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (u *CommandService) DeleteRedisCommand(ids []uint) error {
+	if len(ids) == 1 {
+		command, _ := commandRepo.GetRedis(commonRepo.WithByID(ids[0]))
+		if command.ID == 0 {
+			return constant.ErrRecordNotFound
+		}
+		return commandRepo.DeleteRedis(commonRepo.WithByID(ids[0]))
+	}
+	return commandRepo.DeleteRedis(commonRepo.WithIdsIn(ids))
 }

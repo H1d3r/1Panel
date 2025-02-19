@@ -2,13 +2,15 @@
     <div v-loading="loading">
         <div class="app-status" style="margin-top: 20px" v-if="currentDB?.from === 'remote'">
             <el-card>
-                <div>
-                    <el-tag style="float: left" effect="dark" type="success">PostgreSQL</el-tag>
-                    <el-tag class="status-content">{{ $t('app.version') }}: {{ currentDB?.version }}</el-tag>
+                <div class="flex w-full flex-col gap-4 md:flex-row">
+                    <div class="flex flex-wrap gap-4">
+                        <el-tag style="float: left" effect="dark" type="success">PostgreSQL</el-tag>
+                        <el-tag>{{ $t('app.version') }}: {{ currentDB?.version }}</el-tag>
+                    </div>
                 </div>
             </el-card>
         </div>
-        <LayoutContent :title="'PostgreSQL ' + $t('menu.database')">
+        <LayoutContent :title="'PostgreSQL'">
             <template #app v-if="currentDB?.from === 'local'">
                 <AppStatus
                     :app-key="appKey"
@@ -17,6 +19,7 @@
                     v-model:mask-show="maskShow"
                     @setting="onSetting"
                     @is-exist="checkExist"
+                    ref="appStatusRef"
                 ></AppStatus>
             </template>
 
@@ -53,8 +56,8 @@
             </template>
 
             <template #toolbar>
-                <el-row>
-                    <el-col :xs="24" :sm="20" :md="20" :lg="20" :xl="20">
+                <div class="flex justify-between gap-2 flex-wrap sm:flex-row">
+                    <div class="flex flex-wrap gap-3">
                         <el-button
                             v-if="currentDB && (currentDB.from !== 'local' || postgresqlStatus === 'Running')"
                             type="primary"
@@ -62,12 +65,7 @@
                         >
                             {{ $t('database.create') }}
                         </el-button>
-                        <el-button
-                            v-if="currentDB && (currentDB.from !== 'local' || postgresqlStatus === 'Running')"
-                            @click="onChangeConn"
-                            type="primary"
-                            plain
-                        >
+                        <el-button v-if="currentDB" @click="onChangeConn" type="primary" plain>
                             {{ $t('database.databaseConnInfo') }}
                         </el-button>
                         <el-button
@@ -79,17 +77,21 @@
                             {{ $t('database.loadFromRemote') }}
                         </el-button>
                         <el-button @click="goRemoteDB" type="primary" plain>
-                            {{ $t('database.remoteDB') }}
+                            {{ $t('database.manageRemoteDB') }}
                         </el-button>
                         <el-button @click="goDashboard()" type="primary" plain>PGAdmin4</el-button>
-                    </el-col>
-                    <el-col :xs="24" :sm="4" :md="4" :lg="4" :xl="4">
-                        <TableSearch @search="search()" v-model:searchName="searchName" />
-                    </el-col>
-                </el-row>
+                    </div>
+                    <div><TableSearch @search="search()" v-model:searchName="searchName" /></div>
+                </div>
             </template>
             <template #main v-if="currentDB">
-                <ComplexTable :pagination-config="paginationConfig" @sort-change="search" @search="search" :data="data">
+                <ComplexTable
+                    :class="{ mask: maskShow }"
+                    :pagination-config="paginationConfig"
+                    @sort-change="search"
+                    @search="search"
+                    :data="data"
+                >
                     <el-table-column :label="$t('commons.table.name')" prop="name" sortable>
                         <template #default="{ row }">
                             <Tooltip v-if="!row.isDelete" :islink="false" :text="row.name" />
@@ -125,7 +127,7 @@
                     <el-table-column :label="$t('commons.login.password')" prop="password">
                         <template #default="{ row }">
                             <span v-if="row.username === '' || row.password === ''">-</span>
-                            <div class="flex items-center" v-else>
+                            <div class="flex items-center flex-wrap" v-else>
                                 <div class="star-center" v-if="!row.showPassword">
                                     <span>**********</span>
                                 </div>
@@ -154,7 +156,7 @@
                             </div>
                         </template>
                     </el-table-column>
-                    <el-table-column :label="$t('commons.table.description')" prop="description">
+                    <el-table-column :label="$t('commons.table.description')" prop="description" show-overflow-tooltip>
                         <template #default="{ row }">
                             <fu-input-rw-switch v-model="row.description" @blur="onChange(row)" />
                         </template>
@@ -166,29 +168,37 @@
                         show-overflow-tooltip
                     />
                     <fu-table-operations
-                        width="370px"
+                        :ellipsis="mobile ? 0 : 10"
+                        :min-width="mobile ? 'auto' : 400"
                         :buttons="buttons"
-                        :ellipsis="10"
                         :label="$t('commons.table.operate')"
+                        fixed="right"
                         fix
                     />
                 </ComplexTable>
             </template>
         </LayoutContent>
 
+        <el-card
+            v-if="postgresqlStatus != 'Running' && currentDB && !loading && maskShow && currentDB?.from === 'local'"
+            class="mask-prompt"
+        >
+            <span>{{ $t('commons.service.serviceNotStarted', ['PostgreSQL']) }}</span>
+        </el-card>
+
         <div v-if="dbOptionsLocal.length === 0 && dbOptionsRemote.length === 0">
-            <LayoutContent :title="'PostgreSQL ' + $t('menu.database')" :divider="true">
+            <LayoutContent :title="'PostgreSQL ' + $t('menu.database').toLowerCase()" :divider="true">
                 <template #main>
                     <div class="app-warn">
-                        <div>
+                        <div class="flex flex-col gap-2 items-center justify-center w-full sm:flex-row">
                             <span>{{ $t('app.checkInstalledWarn', [$t('database.noPostgresql')]) }}</span>
-                            <span @click="goRouter('app')">
-                                <el-icon class="ml-2"><Position /></el-icon>
+                            <span @click="goRouter('app')" class="flex items-center justify-center gap-0.5">
+                                <el-icon><Position /></el-icon>
                                 {{ $t('database.goInstall') }}
                             </span>
-                            <div>
-                                <img src="@/assets/images/no_app.svg" />
-                            </div>
+                        </div>
+                        <div>
+                            <img src="@/assets/images/no_app.svg" />
                         </div>
                     </div>
                 </template>
@@ -202,11 +212,12 @@
             :close-on-click-modal="false"
             :destroy-on-close="true"
         >
-            <el-alert :closable="false" :title="$t('app.checkInstalledWarn', [dashboardName])" type="info">
+            <div class="flex justify-center items-center gap-2 flex-wrap">
+                {{ $t('app.checkInstalledWarn', [dashboardName]) }}
                 <el-link icon="Position" @click="getAppDetail" type="primary">
                     {{ $t('database.goInstall') }}
                 </el-link>
-            </el-alert>
+            </div>
             <template #footer>
                 <span class="dialog-footer">
                     <el-button @click="dashboardVisible = false">{{ $t('commons.button.cancel') }}</el-button>
@@ -242,7 +253,7 @@ import Backups from '@/components/backup/index.vue';
 import UploadDialog from '@/components/upload/index.vue';
 import PortJumpDialog from '@/components/port-jump/index.vue';
 import { dateFormat } from '@/utils/util';
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import {
     deleteCheckPostgresqlDB,
     listDatabases,
@@ -297,6 +308,7 @@ const postgresqlContainer = ref();
 const postgresqlStatus = ref();
 const postgresqlVersion = ref();
 
+const appStatusRef = ref();
 const dialogRef = ref();
 const onOpenDialog = async () => {
     let params = {
@@ -319,6 +331,10 @@ const onChangeConn = async () => {
         database: currentDBName.value,
     });
 };
+
+const mobile = computed(() => {
+    return globalStore.isMobile();
+});
 
 const goRemoteDB = async () => {
     if (currentDB.value) {
@@ -346,11 +362,13 @@ const changeDatabase = async () => {
             appKey.value = item.type;
             appName.value = item.database;
             search();
+            appStatusRef.value?.onCheck(appKey.value, appName.value);
             return;
         }
     }
     for (const item of dbOptionsRemote.value) {
         if (item.database == currentDBName.value) {
+            maskShow.value = false;
             currentDB.value = item;
             break;
         }
@@ -460,6 +478,9 @@ const loadDBOptions = async () => {
         }
     }
     if (currentDB.value) {
+        if (currentDB.value.from === 'remote') {
+            maskShow.value = false;
+        }
         globalStore.setCurrentDB('');
         search();
         return;
@@ -476,6 +497,9 @@ const loadDBOptions = async () => {
     }
     if (currentDB.value) {
         search();
+    }
+    if (currentDB.value.from === 'remote') {
+        maskShow.value = false;
     }
 };
 const onDelete = async (row: Database.PostgresqlDBInfo) => {

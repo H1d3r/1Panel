@@ -58,6 +58,46 @@ const webSiteRouter = {
                 requiresAuth: false,
             },
         },
+        {
+            path: '/websites/runtimes/java',
+            name: 'java',
+            hidden: true,
+            component: () => import('@/views/website/runtime/java/index.vue'),
+            meta: {
+                activeMenu: '/websites/runtimes/php',
+                requiresAuth: false,
+            },
+        },
+        {
+            path: '/websites/runtimes/go',
+            name: 'go',
+            hidden: true,
+            component: () => import('@/views/website/runtime/go/index.vue'),
+            meta: {
+                activeMenu: '/websites/runtimes/php',
+                requiresAuth: false,
+            },
+        },
+        {
+            path: '/websites/runtimes/python',
+            name: 'python',
+            hidden: true,
+            component: () => import('@/views/website/runtime/python/index.vue'),
+            meta: {
+                activeMenu: '/websites/runtimes/php',
+                requiresAuth: false,
+            },
+        },
+        {
+            path: '/websites/runtimes/dotnet',
+            name: 'dotNet',
+            hidden: true,
+            component: () => import('@/views/website/runtime/dotnet/index.vue'),
+            meta: {
+                activeMenu: '/websites/runtimes/php',
+                requiresAuth: false,
+            },
+        },
     ],
 };
 

@@ -3,9 +3,11 @@ import { ReqPage, ResPage } from '../interface';
 import { Website } from '../interface/website';
 import { File } from '../interface/file';
 import { TimeoutEnum } from '@/enums/http-enum';
+import { deepCopy } from '@/utils/util';
+import { Base64 } from 'js-base64';
 
 export const SearchWebsites = (req: Website.WebSiteSearch) => {
-    return http.post<ResPage<Website.WebsiteDTO>>(`/websites/search`, req);
+    return http.post<ResPage<Website.WebsiteRes>>(`/websites/search`, req);
 };
 
 export const ListWebsites = () => {
@@ -13,7 +15,11 @@ export const ListWebsites = () => {
 };
 
 export const CreateWebsite = (req: Website.WebSiteCreateReq) => {
-    return http.post<any>(`/websites`, req);
+    let request = deepCopy(req) as Website.WebSiteCreateReq;
+    if (request.ftpPassword) {
+        request.ftpPassword = Base64.encode(request.ftpPassword);
+    }
+    return http.post<any>(`/websites`, request);
 };
 
 export const OpWebsite = (req: Website.WebSiteOp) => {
@@ -192,6 +198,10 @@ export const UpdateProxyConfigFile = (req: Website.ProxyFileUpdate) => {
     return http.post<any>(`/websites/proxies/file`, req);
 };
 
+export const DelProxy = (req: Website.ProxyDel) => {
+    return http.post<any>(`/websites/proxies/del`, req);
+};
+
 export const GetAuthConfig = (req: Website.AuthReq) => {
     return http.post<Website.AuthConfig>(`/websites/auths`, req);
 };
@@ -261,4 +271,19 @@ export const DownloadFile = (params: Website.SSLDownload) => {
 
 export const GetCA = (id: number) => {
     return http.get<Website.CADTO>(`/websites/ca/${id}`);
+};
+
+export const GetDefaultHtml = (type: string) => {
+    return http.get<Website.WebsiteHtml>(`/websites/default/html/${type}`);
+};
+
+export const UpdateDefaultHtml = (req: Website.WebsiteHtmlUpdate) => {
+    return http.post(`/websites/default/html/update`, req);
+};
+
+export const DownloadCAFile = (params: Website.SSLDownload) => {
+    return http.download<BlobPart>(`/websites/ca/download`, params, {
+        responseType: 'blob',
+        timeout: TimeoutEnum.T_40S,
+    });
 };

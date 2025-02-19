@@ -1,7 +1,13 @@
 <template>
-    <el-drawer :close-on-click-modal="false" v-model="open" size="50%" :before-close="handleClose">
+    <el-drawer
+        :close-on-click-modal="false"
+        v-model="open"
+        size="50%"
+        :close-on-press-escape="false"
+        :before-close="handleClose"
+    >
         <template #header>
-            <Header :header="$t('website.group')" :back="handleClose"></Header>
+            <Header :header="$t('website.manageGroup')" :back="handleClose"></Header>
         </template>
 
         <ComplexTable :data="data" @search="search()">

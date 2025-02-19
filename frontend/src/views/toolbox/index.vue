@@ -2,7 +2,7 @@
     <div>
         <RouterButton :buttons="buttons">
             <template #route-button>
-                <div class="router-button">
+                <div class="router-button mr-0 sm:mr-7">
                     <el-button link type="primary" @click="onRestart('1panel')">
                         {{ $t('home.restart_1panel') }}
                     </el-button>
@@ -60,6 +60,14 @@ const buttons = [
     {
         label: i18n.global.t('menu.supervisor'),
         path: '/toolbox/supervisor',
+    },
+    {
+        label: i18n.global.t('toolbox.clam.clam'),
+        path: '/toolbox/clam',
+    },
+    {
+        label: 'FTP',
+        path: '/toolbox/ftp',
     },
     {
         label: 'Fail2ban',
