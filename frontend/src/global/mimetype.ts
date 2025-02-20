@@ -28,6 +28,14 @@ export const Languages = [
         value: ['json'],
     },
     {
+        label: 'vue',
+        value: ['vue'],
+    },
+    {
+        label: 'typescript',
+        value: ['ts'],
+    },
+    {
         label: 'lua',
         value: ['lua'],
     },
@@ -157,12 +165,24 @@ export const DNSTypes = [
         value: 'TencentCloud',
     },
     {
+        label: i18n.global.t('website.huaweicloud'),
+        value: 'HuaweiCloud',
+    },
+    {
+        label: i18n.global.t('website.volcengine'),
+        value: 'Volcengine',
+    },
+    {
         label: 'DNSPod (' + i18n.global.t('ssl.deprecated') + ')',
         value: 'DnsPod',
     },
     {
-        label: 'CloudFlare',
+        label: 'Cloudflare',
         value: 'CloudFlare',
+    },
+    {
+        label: 'CloudDNS',
+        value: 'CloudDns',
     },
     {
         label: 'NameSilo',
@@ -179,6 +199,10 @@ export const DNSTypes = [
     {
         label: 'GoDaddy',
         value: 'Godaddy',
+    },
+    {
+        label: i18n.global.t('website.rainyun'),
+        value: 'RainYun',
     },
 ];
 

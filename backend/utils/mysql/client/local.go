@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -18,14 +19,15 @@ import (
 )
 
 type Local struct {
+	Type          string
 	PrefixCommand []string
 	Database      string
 	Password      string
 	ContainerName string
 }
 
-func NewLocal(command []string, containerName, password, database string) *Local {
-	return &Local{PrefixCommand: command, ContainerName: containerName, Password: password, Database: database}
+func NewLocal(command []string, dbType, containerName, password, database string) *Local {
+	return &Local{Type: dbType, PrefixCommand: command, ContainerName: containerName, Password: password, Database: database}
 }
 
 func (r *Local) Create(info CreateInfo) error {
@@ -222,14 +224,28 @@ func (r *Local) Backup(info BackupInfo) error {
 			return fmt.Errorf("mkdir %s failed, err: %v", info.TargetDir, err)
 		}
 	}
-	outfile, _ := os.OpenFile(path.Join(info.TargetDir, info.FileName), os.O_RDWR|os.O_CREATE, 0755)
-	global.LOG.Infof("start to mysqldump | gzip > %s.gzip", info.TargetDir+"/"+info.FileName)
-	cmd := exec.Command("docker", "exec", r.ContainerName, "mysqldump", "-uroot", "-p"+r.Password, "--default-character-set="+info.Format, info.Name)
+	outfile, err := os.OpenFile(path.Join(info.TargetDir, info.FileName), os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		return fmt.Errorf("open file %s failed, err: %v", path.Join(info.TargetDir, info.FileName), err)
+	}
+	defer outfile.Close()
+	dumpCmd := "mysqldump"
+	if r.Type == constant.AppMariaDB {
+		dumpCmd = "mariadb-dump"
+	}
+	global.LOG.Infof("start to %s | gzip > %s.gzip", dumpCmd, info.TargetDir+"/"+info.FileName)
+	cmd := exec.Command("docker", "exec", r.ContainerName, dumpCmd, "--routines", "-uroot", "-p"+r.Password, "--default-character-set="+info.Format, info.Name)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
 	gzipCmd := exec.Command("gzip", "-cf")
 	gzipCmd.Stdin, _ = cmd.StdoutPipe()
 	gzipCmd.Stdout = outfile
 	_ = gzipCmd.Start()
-	_ = cmd.Run()
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("handle backup database failed, err: %v", stderr.String())
+	}
 	_ = gzipCmd.Wait()
 	return nil
 }
@@ -237,7 +253,7 @@ func (r *Local) Backup(info BackupInfo) error {
 func (r *Local) Recover(info RecoverInfo) error {
 	fi, _ := os.Open(info.SourceFile)
 	defer fi.Close()
-	cmd := exec.Command("docker", "exec", "-i", r.ContainerName, "mysql", "-uroot", "-p"+r.Password, "--default-character-set="+info.Format, info.Name)
+	cmd := exec.Command("docker", "exec", "-i", r.ContainerName, r.Type, "-uroot", "-p"+r.Password, "--default-character-set="+info.Format, info.Name)
 	if strings.HasSuffix(info.SourceFile, ".gz") {
 		gzipFile, err := os.Open(info.SourceFile)
 		if err != nil {
@@ -284,7 +300,10 @@ func (r *Local) SyncDB(version string) ([]SyncDBInfo, error) {
 		}
 		userLines, err := r.ExecSQLForRows(fmt.Sprintf("select user,host from mysql.db where db = '%s'", parts[0]), 300)
 		if err != nil {
-			return datas, err
+			global.LOG.Debugf("sync user of db %s failed, err: %v", parts[0], err)
+			dataItem.Permission = "%"
+			datas = append(datas, dataItem)
+			continue
 		}
 
 		var permissionItem []string
@@ -334,7 +353,7 @@ func (r *Local) ExecSQL(command string, timeout uint) error {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "docker", itemCommand...)
 	stdout, err := cmd.CombinedOutput()
-	if ctx.Err() == context.DeadlineExceeded {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return buserr.New(constant.ErrExecTimeOut)
 	}
 	stdStr := strings.ReplaceAll(string(stdout), "mysql: [Warning] Using a password on the command line interface can be insecure.\n", "")
@@ -351,7 +370,7 @@ func (r *Local) ExecSQLForRows(command string, timeout uint) ([]string, error) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "docker", itemCommand...)
 	stdout, err := cmd.CombinedOutput()
-	if ctx.Err() == context.DeadlineExceeded {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return nil, buserr.New(constant.ErrExecTimeOut)
 	}
 	stdStr := strings.ReplaceAll(string(stdout), "mysql: [Warning] Using a password on the command line interface can be insecure.\n", "")

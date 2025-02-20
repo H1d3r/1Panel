@@ -1,6 +1,12 @@
 <template>
     <div>
-        <el-drawer v-model="drawerVisible" :destroy-on-close="true" :close-on-click-modal="false" size="30%">
+        <el-drawer
+            v-model="drawerVisible"
+            :destroy-on-close="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            size="30%"
+        >
             <template #header>
                 <DrawerHeader :header="$t('setting.noAuthSetting')" :back="handleClose" />
             </template>
@@ -83,6 +89,14 @@ const options = [
     {
         value: '416',
         label: '416 - ' + i18n.global.t('setting.error416'),
+    },
+    {
+        value: '444',
+        label: '444 - ' + i18n.global.t('setting.error444'),
+    },
+    {
+        value: '500',
+        label: '500 - ' + i18n.global.t('setting.error500'),
     },
 ];
 

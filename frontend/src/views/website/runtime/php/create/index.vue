@@ -1,5 +1,5 @@
 <template>
-    <el-drawer :close-on-click-modal="false" v-model="open" size="50%">
+    <el-drawer :close-on-click-modal="false" :close-on-press-escape="false" v-model="open" size="50%">
         <template #header>
             <DrawerHeader :header="$t('runtime.' + mode)" :resource="runtime.name" :back="handleClose" />
         </template>
@@ -107,25 +107,20 @@
                                 ></EditParams>
                                 <el-form-item>
                                     <el-alert :title="$t('runtime.buildHelper')" type="warning" :closable="false" />
-                                </el-form-item>
-                                <el-form-item>
-                                    <el-alert type="info" :closable="false">
+                                    <span class="input-help">
                                         <span>{{ $t('runtime.extendHelper') }}</span>
-                                        <span v-html="$t('runtime.phpPluginHelper')"></span>
+                                        <el-link target="_blank" type="primary" :href="globalStore.docsUrl + phpDocURL">
+                                            {{ $t('php.toExtensionsList') }}
+                                        </el-link>
                                         <br />
-                                    </el-alert>
+                                    </span>
                                 </el-form-item>
                                 <div v-if="mode == 'edit'">
                                     <el-form-item>
                                         <el-checkbox v-model="runtime.rebuild">
                                             {{ $t('runtime.rebuild') }}
                                         </el-checkbox>
-                                    </el-form-item>
-                                    <el-form-item>
-                                        <el-alert type="info" :closable="false">
-                                            <span>{{ $t('runtime.rebuildHelper') }}</span>
-                                            <br />
-                                        </el-alert>
+                                        <span class="input-help">{{ $t('runtime.rebuildHelper') }}</span>
                                     </el-form-item>
                                 </div>
                             </div>
@@ -166,8 +161,12 @@ import { reactive, ref } from 'vue';
 import Params from '../param/index.vue';
 import EditParams from '../edit/index.vue';
 import DrawerHeader from '@/components/drawer-header/index.vue';
+import { GlobalStore } from '@/store';
 
-interface OperateRrops {
+const globalStore = GlobalStore();
+const phpDocURL = globalStore.isIntl ? `/user_manual/websites/runtime_php/` : '/user_manual/websites/php/#php_1';
+
+interface OperateProps {
     id?: number;
     mode: string;
     type: string;
@@ -189,6 +188,48 @@ const appReq = reactive({
     page: 1,
     pageSize: 20,
 });
+const phpSources = globalStore.isIntl
+    ? [
+          {
+              label: i18n.global.t('runtime.default'),
+              value: 'dl-cdn.alpinelinux.org',
+          },
+          {
+              label: i18n.global.t('runtime.xtom'),
+              value: 'mirrors.xtom.com',
+          },
+      ]
+    : [
+          {
+              label: i18n.global.t('runtime.ustc'),
+              value: 'mirrors.ustc.edu.cn',
+          },
+          {
+              label: i18n.global.t('runtime.netease'),
+              value: 'mirrors.163.com',
+          },
+          {
+              label: i18n.global.t('runtime.aliyun'),
+              value: 'mirrors.aliyun.com',
+          },
+          {
+              label: i18n.global.t('runtime.tsinghua'),
+              value: 'mirrors.tuna.tsinghua.edu.cn',
+          },
+          {
+              label: i18n.global.t('runtime.xtomhk'),
+              value: 'mirrors.xtom.com.hk',
+          },
+          {
+              label: i18n.global.t('runtime.xtom'),
+              value: 'mirrors.xtom.com',
+          },
+          {
+              label: i18n.global.t('runtime.default'),
+              value: 'dl-cdn.alpinelinux.org',
+          },
+      ];
+
 const initData = (type: string) => ({
     name: '',
     appDetailID: undefined,
@@ -197,7 +238,7 @@ const initData = (type: string) => ({
     type: type,
     resource: 'appstore',
     rebuild: false,
-    source: 'mirrors.ustc.edu.cn',
+    source: phpSources[0].value,
 });
 const extensions = ref();
 
@@ -211,37 +252,6 @@ const rules = ref<any>({
     image: [Rules.requiredInput, Rules.imageName],
     source: [Rules.requiredSelect],
 });
-
-const phpSources = [
-    {
-        label: i18n.global.t('runtime.ustc'),
-        value: 'mirrors.ustc.edu.cn',
-    },
-    {
-        label: i18n.global.t('runtime.netease'),
-        value: 'mirrors.163.com',
-    },
-    {
-        label: i18n.global.t('runtime.aliyun'),
-        value: 'mirrors.aliyun.com',
-    },
-    {
-        label: i18n.global.t('runtime.tsinghua'),
-        value: 'mirrors.tuna.tsinghua.edu.cn',
-    },
-    {
-        label: i18n.global.t('runtime.xtomhk'),
-        value: 'mirrors.xtom.com.hk',
-    },
-    {
-        label: i18n.global.t('runtime.xtom'),
-        value: 'mirrors.xtom.com',
-    },
-    {
-        label: i18n.global.t('runtime.default'),
-        value: 'dl-cdn.alpinelinux.org',
-    },
-];
 
 const em = defineEmits(['close', 'submit']);
 
@@ -386,7 +396,7 @@ const listPHPExtensions = async () => {
             page: 1,
             pageSize: 100,
         });
-        phpExtensions.value = res.data;
+        phpExtensions.value = res.data.items;
     } catch (error) {}
 };
 
@@ -397,7 +407,7 @@ const changePHPExtension = () => {
     runtime.params['PHP_EXTENSIONS'] = extensions.value.split(',');
 };
 
-const acceptParams = async (props: OperateRrops) => {
+const acceptParams = async (props: OperateProps) => {
     mode.value = props.mode;
     initParam.value = false;
     if (props.mode === 'create') {

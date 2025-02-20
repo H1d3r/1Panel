@@ -1,6 +1,15 @@
 package dto
 
-import "time"
+import (
+	"time"
+)
+
+type PageCronjob struct {
+	PageInfo
+	Info    string `json:"info"`
+	OrderBy string `json:"orderBy" validate:"required,oneof=name status created_at"`
+	Order   string `json:"order" validate:"required,oneof=null ascending descending"`
+}
 
 type CronjobCreate struct {
 	Name string `json:"name" validate:"required"`
@@ -21,10 +30,14 @@ type CronjobCreate struct {
 	BackupAccounts  string `json:"backupAccounts"`
 	DefaultDownload string `json:"defaultDownload"`
 	RetainCopies    int    `json:"retainCopies" validate:"number,min=1"`
+	Secret          string `json:"secret"`
+	AlertCount      uint   `json:"alertCount"`
+	AlertTitle      string `json:"alertTitle"`
 }
 
 type CronjobUpdate struct {
 	ID   uint   `json:"id" validate:"required"`
+	Type string `json:"type" validate:"required"`
 	Name string `json:"name" validate:"required"`
 	Spec string `json:"spec" validate:"required"`
 
@@ -42,6 +55,9 @@ type CronjobUpdate struct {
 	BackupAccounts  string `json:"backupAccounts"`
 	DefaultDownload string `json:"defaultDownload"`
 	RetainCopies    int    `json:"retainCopies" validate:"number,min=1"`
+	Secret          string `json:"secret"`
+	AlertCount      uint   `json:"alertCount"`
+	AlertTitle      string `json:"alertTitle"`
 }
 
 type CronjobUpdateStatus struct {
@@ -87,6 +103,8 @@ type CronjobInfo struct {
 
 	LastRecordTime string `json:"lastRecordTime"`
 	Status         string `json:"status"`
+	Secret         string `json:"secret"`
+	AlertCount     uint   `json:"alertCount"`
 }
 
 type SearchRecord struct {
@@ -98,12 +116,12 @@ type SearchRecord struct {
 }
 
 type Record struct {
-	ID         uint      `json:"id"`
-	StartTime  time.Time `json:"startTime"`
-	Records    string    `json:"records"`
-	Status     string    `json:"status"`
-	Message    string    `json:"message"`
-	TargetPath string    `json:"targetPath"`
-	Interval   int       `json:"interval"`
-	File       string    `json:"file"`
+	ID         uint   `json:"id"`
+	StartTime  string `json:"startTime"`
+	Records    string `json:"records"`
+	Status     string `json:"status"`
+	Message    string `json:"message"`
+	TargetPath string `json:"targetPath"`
+	Interval   int    `json:"interval"`
+	File       string `json:"file"`
 }

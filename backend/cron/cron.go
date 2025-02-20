@@ -1,6 +1,8 @@
 package cron
 
 import (
+	"fmt"
+	mathRand "math/rand"
 	"time"
 
 	"github.com/1Panel-dev/1Panel/backend/app/model"
@@ -15,14 +17,14 @@ import (
 )
 
 func Run() {
-	nyc, _ := time.LoadLocation(common.LoadTimeZone())
+	nyc, _ := time.LoadLocation(common.LoadTimeZoneByCmd())
 	global.Cron = cron.New(cron.WithLocation(nyc), cron.WithChain(cron.Recover(cron.DefaultLogger)), cron.WithChain(cron.DelayIfStillRunning(cron.DefaultLogger)))
 
 	var (
 		interval model.Setting
 		status   model.Setting
 	)
-	syncBeforeStart()
+	go syncBeforeStart()
 	if err := global.DB.Where("key = ?", "MonitorStatus").Find(&status).Error; err != nil {
 		global.LOG.Errorf("load monitor status from db failed, err: %v", err)
 	}
@@ -41,8 +43,11 @@ func Run() {
 	if _, err := global.Cron.AddJob("@daily", job.NewSSLJob()); err != nil {
 		global.LOG.Errorf("can not add  ssl corn job: %s", err.Error())
 	}
-	if _, err := global.Cron.AddJob("@daily", job.NewAppStoreJob()); err != nil {
+	if _, err := global.Cron.AddJob(fmt.Sprintf("%v %v * * *", mathRand.Intn(60), mathRand.Intn(3)), job.NewAppStoreJob()); err != nil {
 		global.LOG.Errorf("can not add  appstore corn job: %s", err.Error())
+	}
+	if _, err := global.Cron.AddJob("@daily", job.NewCacheJob()); err != nil {
+		global.LOG.Errorf("can not add  cache corn job: %s", err.Error())
 	}
 
 	var backup model.BackupAccount
@@ -66,7 +71,7 @@ func Run() {
 		global.LOG.Errorf("start my cronjob failed, err: %v", err)
 	}
 	for i := 0; i < len(cronJobs); i++ {
-		entryIDs, err := service.NewICronjobService().StartJob(&cronJobs[i])
+		entryIDs, err := service.NewICronjobService().StartJob(&cronJobs[i], false)
 		if err != nil {
 			global.LOG.Errorf("start %s job %s failed, err: %v", cronJobs[i].Type, cronJobs[i].Name, err)
 		}
@@ -89,7 +94,7 @@ func syncBeforeStart() {
 		global.LOG.Errorf("load remote time with [%s] failed, err: %v", ntpSite.Value, err)
 		return
 	}
-	ts := ntime.Format("2006-01-02 15:04:05")
+	ts := ntime.Format(constant.DateTimeLayout)
 	if err := ntp.UpdateSystemTime(ts); err != nil {
 		global.LOG.Errorf("failed to synchronize system time with [%s], err: %v", ntpSite.Value, err)
 	}
