@@ -2,7 +2,7 @@
     <el-dialog v-model="open" :title="$t('app.delete')" width="30%" :close-on-click-modal="false">
         <div>
             <el-row>
-                <el-col :span="20" :offset="2">
+                <el-col :span="22" :offset="1">
                     <el-alert
                         class="mt-2"
                         :show-icon="true"
@@ -15,8 +15,11 @@
                         </div>
                     </el-alert>
                     <div class="mt-4" v-if="recycleStatus === 'enable'">
-                        <el-checkbox v-model="forceDelete">{{ $t('file.forceDeleteHelper') }}</el-checkbox>
+                        <el-checkbox v-model="forceDelete" class="force-delete">
+                            <span>{{ $t('file.forceDeleteHelper') }}</span>
+                        </el-checkbox>
                     </div>
+
                     <div class="file-list">
                         <div class="flx-align-center mb-1" v-for="(row, index) in files" :key="index">
                             <div>
@@ -57,6 +60,7 @@ import { File } from '@/api/interface/file';
 import { getIcon } from '@/utils/util';
 import { DeleteFile, GetRecycleStatus } from '@/api/modules/files';
 import { MsgSuccess, MsgWarning } from '@/utils/message';
+import { loadBaseDir } from '@/api/modules/setting';
 
 const open = ref(false);
 const files = ref();
@@ -82,13 +86,21 @@ const getStatus = async () => {
     } catch (error) {}
 };
 
-const onConfirm = () => {
+const onConfirm = async () => {
     const pros = [];
     for (const s of files.value) {
-        if (s['path'].indexOf('.1panel_clash') > -1) {
-            MsgWarning(i18n.global.t('file.clashDleteAlert'));
-            return;
+        if (s['isDir']) {
+            if (s['path'].indexOf('.1panel_clash') > -1) {
+                MsgWarning(i18n.global.t('file.clashDeleteAlert'));
+                return;
+            }
+            const pathRes = await loadBaseDir();
+            if (s['path'] === pathRes.data) {
+                MsgWarning(i18n.global.t('file.panelInstallDir'));
+                return;
+            }
         }
+
         pros.push(DeleteFile({ path: s['path'], isDir: s['isDir'], forceDelete: forceDelete.value }));
     }
     loading.value = true;
@@ -128,5 +140,11 @@ defineExpose({
 .delete-warn {
     line-height: 20px;
     word-wrap: break-word;
+}
+
+.force-delete {
+    white-space: pre-line;
+    word-wrap: break-word;
+    line-height: 50px;
 }
 </style>

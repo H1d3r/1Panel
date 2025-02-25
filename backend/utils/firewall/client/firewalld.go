@@ -2,13 +2,17 @@ package client
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 
 	"github.com/1Panel-dev/1Panel/backend/buserr"
 	"github.com/1Panel-dev/1Panel/backend/constant"
+	"github.com/1Panel-dev/1Panel/backend/global"
 	"github.com/1Panel-dev/1Panel/backend/utils/cmd"
 )
+
+var ForwardListRegex = regexp.MustCompile(`^port=(\d{1,5}):proto=(.+?):toport=(\d{1,5}):toaddr=(.*)$`)
 
 type Firewall struct{}
 
@@ -21,7 +25,7 @@ func (f *Firewall) Name() string {
 }
 
 func (f *Firewall) Status() (string, error) {
-	stdout, _ := cmd.Exec("firewall-cmd --state")
+	stdout, _ := cmd.Exec("LANGUAGE=en_US:en firewall-cmd --state")
 	if stdout == "running\n" {
 		return "running", nil
 	}
@@ -29,7 +33,7 @@ func (f *Firewall) Status() (string, error) {
 }
 
 func (f *Firewall) Version() (string, error) {
-	stdout, err := cmd.Exec("firewall-cmd --version")
+	stdout, err := cmd.Exec("LANGUAGE=en_US:en firewall-cmd --version")
 	if err != nil {
 		return "", fmt.Errorf("load the firewall version failed, err: %s", stdout)
 	}
@@ -105,13 +109,44 @@ func (f *Firewall) ListPort() ([]FireInfo, error) {
 				continue
 			}
 			itemRule := f.loadInfo(rule)
-			if len(itemRule.Port) != 0 && itemRule.Family == "ipv4" {
-				itemRule.Family = ""
+			if len(itemRule.Port) != 0 && (itemRule.Family == "ipv4" || (itemRule.Family == "ipv6" && len(itemRule.Address) != 0)) {
 				datas = append(datas, itemRule)
 			}
 		}
 	}()
 	wg.Wait()
+	return datas, nil
+}
+
+func (f *Firewall) ListForward() ([]FireInfo, error) {
+	if err := f.EnableForward(); err != nil {
+		global.LOG.Errorf("init port forward failed, err: %v", err)
+	}
+	stdout, err := cmd.Exec("firewall-cmd --zone=public --list-forward-ports")
+	if err != nil {
+		return nil, err
+	}
+	var datas []FireInfo
+	for _, line := range strings.Split(stdout, "\n") {
+		line = strings.TrimFunc(line, func(r rune) bool {
+			return r <= 32
+		})
+		if ForwardListRegex.MatchString(line) {
+			match := ForwardListRegex.FindStringSubmatch(line)
+			if len(match) < 4 {
+				continue
+			}
+			if len(match[4]) == 0 {
+				match[4] = "127.0.0.1"
+			}
+			datas = append(datas, FireInfo{
+				Port:       match[1],
+				Protocol:   match[2],
+				TargetIP:   match[4],
+				TargetPort: match[3],
+			})
+		}
+	}
 	return datas, nil
 }
 
@@ -151,6 +186,9 @@ func (f *Firewall) RichRules(rule FireInfo, operation string) error {
 		return buserr.New(constant.ErrCmdIllegal)
 	}
 	ruleStr := "rule family=ipv4 "
+	if strings.Contains(rule.Address, ":") {
+		ruleStr = "rule family=ipv6 "
+	}
 	if len(rule.Address) != 0 {
 		ruleStr += fmt.Sprintf("source address=%s ", rule.Address)
 	}
@@ -175,14 +213,17 @@ func (f *Firewall) RichRules(rule FireInfo, operation string) error {
 }
 
 func (f *Firewall) PortForward(info Forward, operation string) error {
-	ruleStr := fmt.Sprintf("firewall-cmd --%s-forward-port=port=%s:proto=%s:toport=%s --permanent", operation, info.Port, info.Protocol, info.Target)
-	if len(info.Address) != 0 {
-		ruleStr = fmt.Sprintf("firewall-cmd --%s-forward-port=port=%s:proto=%s:toaddr=%s:toport=%s --permanent", operation, info.Port, info.Protocol, info.Address, info.Target)
+	ruleStr := fmt.Sprintf("firewall-cmd --zone=public --%s-forward-port=port=%s:proto=%s:toport=%s --permanent", operation, info.Port, info.Protocol, info.TargetPort)
+	if info.TargetIP != "" && info.TargetIP != "127.0.0.1" && info.TargetIP != "localhost" {
+		ruleStr = fmt.Sprintf("firewall-cmd --zone=public --%s-forward-port=port=%s:proto=%s:toaddr=%s:toport=%s --permanent", operation, info.Port, info.Protocol, info.TargetIP, info.TargetPort)
 	}
 
 	stdout, err := cmd.Exec(ruleStr)
 	if err != nil {
 		return fmt.Errorf("%s port forward failed, err: %s", operation, stdout)
+	}
+	if err = f.Reload(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -207,4 +248,20 @@ func (f *Firewall) loadInfo(line string) FireInfo {
 		}
 	}
 	return itemRule
+}
+
+func (f *Firewall) EnableForward() error {
+	stdout, err := cmd.Exec("firewall-cmd --zone=public --query-masquerade")
+	if err != nil {
+		if strings.HasSuffix(strings.TrimSpace(stdout), "no") {
+			stdout, err = cmd.Exec("firewall-cmd --zone=public --add-masquerade --permanent")
+			if err != nil {
+				return fmt.Errorf("%s: %s", err, stdout)
+			}
+			return f.Reload()
+		}
+		return fmt.Errorf("%s: %s", err, stdout)
+	}
+
+	return nil
 }

@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -30,8 +31,8 @@ type MysqlClient interface {
 
 func NewMysqlClient(conn client.DBInfo) (MysqlClient, error) {
 	if conn.From == "local" {
-		connArgs := []string{"exec", conn.Address, "mysql", "-u" + conn.Username, "-p" + conn.Password, "-e"}
-		return client.NewLocal(connArgs, conn.Address, conn.Password, conn.Database), nil
+		connArgs := []string{"exec", conn.Address, conn.Type, "-u" + conn.Username, "-p" + conn.Password, "-e"}
+		return client.NewLocal(connArgs, conn.Type, conn.Address, conn.Password, conn.Database), nil
 	}
 
 	if strings.Contains(conn.Address, ":") {
@@ -54,11 +55,12 @@ func NewMysqlClient(conn client.DBInfo) (MysqlClient, error) {
 		global.LOG.Errorf("test mysql conn failed, err: %v", err)
 		return nil, err
 	}
-	if ctx.Err() == context.DeadlineExceeded {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return nil, buserr.New(constant.ErrExecTimeOut)
 	}
 
 	return client.NewRemote(client.Remote{
+		Type:     conn.Type,
 		Client:   db,
 		Database: conn.Database,
 		User:     conn.Username,

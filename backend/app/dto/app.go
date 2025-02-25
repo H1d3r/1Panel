@@ -1,9 +1,5 @@
 package dto
 
-import (
-	"github.com/1Panel-dev/1Panel/backend/app/model"
-)
-
 type AppDatabase struct {
 	ServiceName string `json:"PANEL_DB_HOST"`
 	DbName      string `json:"PANEL_DB_NAME"`
@@ -37,8 +33,9 @@ type AppOssConfig struct {
 }
 
 type AppVersion struct {
-	Version  string `json:"version"`
-	DetailId uint   `json:"detailId"`
+	Version       string `json:"version"`
+	DetailId      uint   `json:"detailId"`
+	DockerCompose string `json:"dockerCompose"`
 }
 
 type AppList struct {
@@ -61,7 +58,7 @@ type AppDefine struct {
 }
 
 type LocalAppAppDefine struct {
-	AppProperty model.App `json:"additionalProperties" yaml:"additionalProperties"`
+	AppProperty AppProperty `json:"additionalProperties" yaml:"additionalProperties"`
 }
 
 type LocalAppParam struct {
@@ -81,8 +78,9 @@ type AppProperty struct {
 	Name               string   `json:"name"`
 	Type               string   `json:"type"`
 	Tags               []string `json:"tags"`
-	ShortDescZh        string   `json:"shortDescZh"`
-	ShortDescEn        string   `json:"shortDescEn"`
+	ShortDescZh        string   `json:"shortDescZh" yaml:"shortDescZh"`
+	ShortDescEn        string   `json:"shortDescEn" yaml:"shortDescEn"`
+	Description        Locale   `json:"description"`
 	Key                string   `json:"key"`
 	Required           []string `json:"Required"`
 	CrossVersionUpdate bool     `json:"crossVersionUpdate"`
@@ -91,6 +89,8 @@ type AppProperty struct {
 	Website            string   `json:"website"`
 	Github             string   `json:"github"`
 	Document           string   `json:"document"`
+	Version            float64  `json:"version"`
+	GpuSupport         bool     `json:"gpuSupport"`
 }
 
 type AppConfigVersion struct {
@@ -102,19 +102,33 @@ type AppConfigVersion struct {
 }
 
 type Tag struct {
-	Key  string `json:"key"`
-	Name string `json:"name"`
-	Sort int    `json:"sort"`
+	Key     string `json:"key"`
+	Name    string `json:"name"`
+	Sort    int    `json:"sort"`
+	Locales Locale `json:"locales"`
+}
+
+type Locale struct {
+	En     string `json:"en"`
+	Ja     string `json:"ja"`
+	Ms     string `json:"ms"`
+	PtBr   string `json:"pt-br" yaml:"pt-br"`
+	Ru     string `json:"ru"`
+	ZhHant string `json:"zh-hant" yaml:"zh-hant"`
+	Zh     string `json:"zh"`
+	Ko     string `json:"ko"`
 }
 
 type AppForm struct {
-	FormFields []AppFormFields `json:"formFields"`
+	FormFields     []AppFormFields `json:"formFields"`
+	SupportVersion float64         `json:"supportVersion"`
 }
 
 type AppFormFields struct {
 	Type     string         `json:"type"`
 	LabelZh  string         `json:"labelZh"`
 	LabelEn  string         `json:"labelEn"`
+	Label    Locale         `json:"label"`
 	Required bool           `json:"required"`
 	Default  interface{}    `json:"default"`
 	EnvKey   string         `json:"envKey"`

@@ -3,6 +3,7 @@ package files
 import (
 	"archive/zip"
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -15,9 +16,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/1Panel-dev/1Panel/backend/constant"
 	"github.com/1Panel-dev/1Panel/backend/utils/cmd"
 	http2 "github.com/1Panel-dev/1Panel/backend/utils/http"
 	cZip "github.com/klauspost/compress/zip"
@@ -314,6 +315,7 @@ func (f FileOp) DownloadFile(url, dst string) error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 
 	out, err := os.Create(dst)
 	if err != nil {
@@ -324,8 +326,25 @@ func (f FileOp) DownloadFile(url, dst string) error {
 	if _, err = io.Copy(out, resp.Body); err != nil {
 		return fmt.Errorf("save download file [%s] error, err %s", dst, err.Error())
 	}
-	out.Close()
-	resp.Body.Close()
+	return nil
+}
+
+func (f FileOp) DownloadFileWithProxy(url, dst string) error {
+	_, resp, err := http2.HandleGet(url, http.MethodGet, constant.TimeOut5m)
+	if err != nil {
+		return err
+	}
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("create download file [%s] error, err %s", dst, err.Error())
+	}
+	defer out.Close()
+
+	reader := bytes.NewReader(resp)
+	if _, err = io.Copy(out, reader); err != nil {
+		return fmt.Errorf("save download file [%s] error, err %s", dst, err.Error())
+	}
 	return nil
 }
 
@@ -437,20 +456,20 @@ func (f FileOp) CopyFile(src, dst string) error {
 }
 
 func (f FileOp) GetDirSize(path string) (float64, error) {
-	var m sync.Map
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-	go ScanDir(f.Fs, path, &m, &wg)
-	wg.Wait()
-
-	var dirSize float64
-	m.Range(func(k, v interface{}) bool {
-		dirSize = dirSize + v.(float64)
-		return true
+	var size int64
+	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
 	})
-
-	return dirSize, nil
+	if err != nil {
+		return 0, err
+	}
+	return float64(size), nil
 }
 
 func getFormat(cType CompressType) archiver.CompressedArchive {
@@ -478,7 +497,7 @@ func getFormat(cType CompressType) archiver.CompressedArchive {
 	return format
 }
 
-func (f FileOp) Compress(srcRiles []string, dst string, name string, cType CompressType) error {
+func (f FileOp) Compress(srcRiles []string, dst string, name string, cType CompressType, secret string) error {
 	format := getFormat(cType)
 
 	fileMaps := make(map[string]string, len(srcRiles))
@@ -507,7 +526,13 @@ func (f FileOp) Compress(srcRiles []string, dst string, name string, cType Compr
 			return nil
 		}
 		_ = f.DeleteFile(dstFile)
-		return NewZipArchiver().Compress(srcRiles, dstFile)
+		return NewZipArchiver().Compress(srcRiles, dstFile, "")
+	case TarGz:
+		err = NewTarGzArchiver().Compress(srcRiles, dstFile, secret)
+		if err != nil {
+			_ = f.DeleteFile(dstFile)
+			return err
+		}
 	default:
 		err = format.Archive(context.Background(), out, files)
 		if err != nil {
@@ -585,18 +610,19 @@ func (f FileOp) decompressWithSDK(srcFile string, dst string, cType CompressType
 	return format.Extract(context.Background(), input, nil, handler)
 }
 
-func (f FileOp) Decompress(srcFile string, dst string, cType CompressType) error {
-	if err := f.decompressWithSDK(srcFile, dst, cType); err != nil {
-		if cType == Tar || cType == Zip {
-			shellArchiver, err := NewShellArchiver(cType)
-			if err != nil {
-				return err
-			}
-			return shellArchiver.Extract(srcFile, dst)
+func (f FileOp) Decompress(srcFile string, dst string, cType CompressType, secret string) error {
+	if cType == Tar || cType == Zip || cType == TarGz {
+		shellArchiver, err := NewShellArchiver(cType)
+		if !f.Stat(dst) {
+			_ = f.CreateDir(dst, 0755)
 		}
-		return err
+		if err == nil {
+			if err = shellArchiver.Extract(srcFile, dst, secret); err == nil {
+				return nil
+			}
+		}
 	}
-	return nil
+	return f.decompressWithSDK(srcFile, dst, cType)
 }
 
 func ZipFile(files []archiver.File, dst afero.File) error {

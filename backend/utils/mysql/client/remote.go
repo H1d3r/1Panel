@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"database/sql"
@@ -16,11 +17,12 @@ import (
 	"github.com/1Panel-dev/1Panel/backend/constant"
 	"github.com/1Panel-dev/1Panel/backend/global"
 	"github.com/1Panel-dev/1Panel/backend/utils/files"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 )
 
 type Remote struct {
+	Type     string
 	Client   *sql.DB
 	Database string
 	User     string
@@ -233,23 +235,36 @@ func (r *Remote) Backup(info BackupInfo) error {
 			return fmt.Errorf("mkdir %s failed, err: %v", info.TargetDir, err)
 		}
 	}
-	outfile, _ := os.OpenFile(path.Join(info.TargetDir, info.FileName), os.O_RDWR|os.O_CREATE, 0755)
-	global.LOG.Infof("start to mysqldump | gzip > %s.gzip", info.TargetDir+"/"+info.FileName)
+	outfile, err := os.OpenFile(path.Join(info.TargetDir, info.FileName), os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		return fmt.Errorf("open file %s failed, err: %v", path.Join(info.TargetDir, info.FileName), err)
+	}
+	defer outfile.Close()
+	dumpCmd := "mysqldump"
+	if r.Type == constant.AppMariaDB {
+		dumpCmd = "mariadb-dump"
+	}
+	global.LOG.Infof("start to %s | gzip > %s.gzip", dumpCmd, info.TargetDir+"/"+info.FileName)
 	image, err := loadImage(info.Type, info.Version)
 	if err != nil {
 		return err
 	}
-	backupCmd := fmt.Sprintf("docker run --rm --net=host -i %s /bin/bash -c 'mysqldump -h %s -P %d -u%s -p%s %s --default-character-set=%s %s'",
-		image, r.Address, r.Port, r.User, r.Password, sslSkip(info.Version), info.Format, info.Name)
+	backupCmd := fmt.Sprintf("docker run --rm --net=host -i %s /bin/bash -c '%s --routines -h %s -P %d -u%s -p%s %s --default-character-set=%s %s'",
+		image, dumpCmd, r.Address, r.Port, r.User, r.Password, sslSkip(info.Version, r.Type), info.Format, info.Name)
 
-	global.LOG.Debug(backupCmd)
+	global.LOG.Debug(strings.ReplaceAll(backupCmd, r.Password, "******"))
 	cmd := exec.Command("bash", "-c", backupCmd)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
 	gzipCmd := exec.Command("gzip", "-cf")
 	gzipCmd.Stdin, _ = cmd.StdoutPipe()
 	gzipCmd.Stdout = outfile
+
 	_ = gzipCmd.Start()
-	_ = cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("handle backup database failed, err: %v", stderr.String())
+	}
 	_ = gzipCmd.Wait()
 	return nil
 }
@@ -263,10 +278,10 @@ func (r *Remote) Recover(info RecoverInfo) error {
 		return err
 	}
 
-	recoverCmd := fmt.Sprintf("docker run --rm --net=host -i %s /bin/bash -c 'mysql -h %s -P %d -u%s -p%s %s --default-character-set=%s %s'",
-		image, r.Address, r.Port, r.User, r.Password, sslSkip(info.Version), info.Format, info.Name)
+	recoverCmd := fmt.Sprintf("docker run --rm --net=host -i %s /bin/bash -c '%s -h %s -P %d -u%s -p%s %s --default-character-set=%s %s'",
+		image, r.Type, r.Address, r.Port, r.User, r.Password, sslSkip(info.Version, r.Type), info.Format, info.Name)
 
-	global.LOG.Debug(recoverCmd)
+	global.LOG.Debug(strings.ReplaceAll(recoverCmd, r.Password, "******"))
 	cmd := exec.Command("bash", "-c", recoverCmd)
 
 	if strings.HasSuffix(info.SourceFile, ".gz") {
@@ -317,7 +332,10 @@ func (r *Remote) SyncDB(version string) ([]SyncDBInfo, error) {
 		}
 		userRows, err := r.Client.Query("select user,host from mysql.db where db = ?", dbName)
 		if err != nil {
-			return datas, err
+			global.LOG.Debugf("sync user of db %s failed, err: %v", dbName, err)
+			dataItem.Permission = "%"
+			datas = append(datas, dataItem)
+			continue
 		}
 
 		var permissionItem []string
@@ -372,7 +390,7 @@ func (r *Remote) ExecSQL(command string, timeout uint) error {
 	if _, err := r.Client.ExecContext(ctx, command); err != nil {
 		return err
 	}
-	if ctx.Err() == context.DeadlineExceeded {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return buserr.New(constant.ErrExecTimeOut)
 	}
 
@@ -387,7 +405,7 @@ func (r *Remote) ExecSQLForHosts(timeout uint) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if ctx.Err() == context.DeadlineExceeded {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return nil, buserr.New(constant.ErrExecTimeOut)
 	}
 	var rows []string
@@ -404,11 +422,11 @@ func (r *Remote) ExecSQLForHosts(timeout uint) ([]string, error) {
 func loadImage(dbType, version string) (string, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		fmt.Println(err)
+		return "", err
 	}
-	images, err := cli.ImageList(context.Background(), types.ImageListOptions{})
+	images, err := cli.ImageList(context.Background(), image.ListOptions{})
 	if err != nil {
-		fmt.Println(err)
+		return "", err
 	}
 
 	for _, image := range images {
@@ -430,14 +448,24 @@ func loadImage(dbType, version string) (string, error) {
 			}
 		}
 	}
-	if dbType == "mariadb" || version == "8.x" {
-		return "mysql:8.2.0", nil
-	}
-	return "mysql:" + version, nil
+	return loadVersion(dbType, version), nil
 }
 
-func sslSkip(version string) string {
-	if strings.HasPrefix(version, "5.6") || strings.HasPrefix(version, "5.7") {
+func loadVersion(dbType string, version string) string {
+	if dbType == "mariadb" {
+		return "mariadb:11.3.2 "
+	}
+	if strings.HasPrefix(version, "5.6") {
+		return "mysql:5.6.51"
+	}
+	if strings.HasPrefix(version, "5.7") {
+		return "mysql:5.7.44"
+	}
+	return "mysql:8.2.0"
+}
+
+func sslSkip(version, dbType string) string {
+	if dbType == constant.AppMariaDB || strings.HasPrefix(version, "5.6") || strings.HasPrefix(version, "5.7") {
 		return "--skip-ssl"
 	}
 	return "--ssl-mode=DISABLED"

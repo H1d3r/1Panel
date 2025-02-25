@@ -1,46 +1,34 @@
 <template>
-    <div>
+    <div v-loading="firstLoading">
         <div v-if="defaultButton">
             <el-checkbox border v-model="tailLog" class="float-left" @change="changeTail(false)">
                 {{ $t('commons.button.watch') }}
             </el-checkbox>
-            <el-button class="ml-2.5" @click="onDownload" icon="Download" :disabled="data.content === ''">
+            <el-button class="ml-2.5" @click="onDownload" icon="Download" :disabled="logs.length === 0">
                 {{ $t('file.download') }}
             </el-button>
             <span v-if="$slots.button" class="ml-2.5">
                 <slot name="button"></slot>
             </span>
         </div>
-        <div class="mt-2.5">
-            <Codemirror
-                ref="logContainer"
-                :style="styleObject"
-                :autofocus="true"
-                :placeholder="$t('website.noLog')"
-                :indent-with-tab="true"
-                :tabSize="4"
-                :lineWrapping="true"
-                :matchBrackets="true"
-                theme="cobalt"
-                :styleActiveLine="true"
-                :extensions="extensions"
-                v-model="content"
-                :disabled="true"
-                @ready="handleReady"
-            />
+        <div class="log-container" ref="logContainer" @scroll="onScroll">
+            <div class="log-spacer" :style="{ height: `${totalHeight}px` }"></div>
+            <div
+                v-for="(log, index) in visibleLogs"
+                :key="startIndex + index"
+                class="log-item"
+                :style="{ top: `${(startIndex + index) * logHeight}px` }"
+            >
+                <span>{{ log }}</span>
+            </div>
         </div>
     </div>
 </template>
-<script lang="ts" setup>
-import { Codemirror } from 'vue-codemirror';
-import { javascript } from '@codemirror/lang-javascript';
-import { oneDark } from '@codemirror/theme-one-dark';
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef } from 'vue';
-import { downloadFile } from '@/utils/util';
-import { ReadByLine } from '@/api/modules/files';
-import { watch } from 'vue';
 
-const extensions = [javascript(), oneDark];
+<script lang="ts" setup>
+import { ReadByLine } from '@/api/modules/files';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, reactive } from 'vue';
+import { downloadFile } from '@/utils/util';
 
 interface LogProps {
     id?: number;
@@ -48,7 +36,6 @@ interface LogProps {
     name?: string;
     tail?: boolean;
 }
-
 const props = defineProps({
     config: {
         type: Object as () => LogProps | null,
@@ -61,7 +48,7 @@ const props = defineProps({
     },
     style: {
         type: String,
-        default: 'height: calc(100vh - 200px); width: 100%; min-height: 400px',
+        default: 'height: calc(100vh - 200px); width: 100%; min-height: 400px; overflow: auto;',
     },
     defaultButton: {
         type: Boolean,
@@ -76,70 +63,6 @@ const props = defineProps({
         default: false,
     },
 });
-const data = ref({
-    enable: false,
-    content: '',
-    path: '',
-});
-
-let timer: NodeJS.Timer | null = null;
-const tailLog = ref(false);
-const view = shallowRef();
-const content = ref('');
-const end = ref(false);
-const lastContent = ref('');
-const logContainer = ref();
-const scrollerElement = ref<HTMLElement | null>(null);
-
-const readReq = reactive({
-    id: 0,
-    type: '',
-    name: '',
-    page: 0,
-    pageSize: 2000,
-});
-const emit = defineEmits(['update:loading', 'update:hasContent', 'update:isReading']);
-
-const handleReady = (payload) => {
-    view.value = payload.view;
-    const editorContainer = payload.container;
-    const editorElement = editorContainer.querySelector('.cm-editor');
-    scrollerElement.value = editorElement.querySelector('.cm-scroller') as HTMLElement;
-};
-
-const loading = ref(props.loading);
-
-watch(
-    () => props.loading,
-    (newLoading) => {
-        loading.value = newLoading;
-    },
-);
-
-const changeLoading = () => {
-    loading.value = !loading.value;
-    emit('update:loading', loading.value);
-};
-
-const styleObject = computed(() => {
-    const styles = {};
-    let style = 'height: calc(100vh - 200px); width: 100%; min-height: 400px';
-    if (props.style != null && props.style != '') {
-        style = props.style;
-    }
-    style.split(';').forEach((styleRule) => {
-        const [property, value] = styleRule.split(':');
-        if (property && value) {
-            const formattedProperty = property
-                .trim()
-                .replace(/([a-z])([A-Z])/g, '$1-$2')
-                .toLowerCase();
-            styles[formattedProperty] = value.trim();
-        }
-    });
-    return styles;
-});
-
 const stopSignals = [
     'docker-compose up failed!',
     'docker-compose up successful!',
@@ -149,55 +72,65 @@ const stopSignals = [
     'image pull successful!',
     'image push failed!',
     'image push successful!',
+    'ollama pull completed!',
 ];
+const emit = defineEmits(['update:loading', 'update:hasContent', 'update:isReading']);
+const tailLog = ref(false);
+const loading = ref(props.loading);
+const readReq = reactive({
+    id: 0,
+    type: '',
+    name: '',
+    page: 1,
+    pageSize: 500,
+    latest: false,
+});
+const isLoading = ref(false);
+const end = ref(false);
+const lastLogs = ref([]);
+const maxPage = ref(0);
+const minPage = ref(0);
+let timer: NodeJS.Timer | null = null;
+const logPath = ref('');
 
-const getContent = () => {
-    emit('update:isReading', true);
-    if (!end.value) {
-        readReq.page += 1;
+const firstLoading = ref(false);
+const logs = ref<string[]>([]);
+const logContainer = ref<HTMLElement | null>(null);
+const logHeight = 20;
+const logCount = ref(0);
+const totalHeight = computed(() => logHeight * logCount.value);
+const containerHeight = ref(500);
+const visibleCount = computed(() => Math.ceil(containerHeight.value / logHeight)); // 计算可见日志条数（容器高度 / 日志高度）
+const startIndex = ref(0);
+
+const visibleLogs = computed(() => {
+    return logs.value.slice(startIndex.value, startIndex.value + visibleCount.value);
+});
+
+const onScroll = () => {
+    if (logContainer.value) {
+        const scrollTop = logContainer.value.scrollTop;
+        if (scrollTop == 0) {
+            readReq.page = minPage.value - 1;
+            if (readReq.page < 1) {
+                return;
+            }
+            minPage.value = readReq.page;
+            getContent(true);
+        }
+        startIndex.value = Math.floor(scrollTop / logHeight);
     }
-    readReq.id = props.config.id;
-    readReq.type = props.config.type;
-    readReq.name = props.config.name;
-    ReadByLine(readReq).then((res) => {
-        if (!end.value && res.data.end) {
-            lastContent.value = content.value;
-        }
-        res.data.content = res.data.content.replace(/\\u(\w{4})/g, function (match, grp) {
-            return String.fromCharCode(parseInt(grp, 16));
-        });
-        data.value = res.data;
-        if (res.data.content != '') {
-            if (stopSignals.some((signal) => res.data.content.endsWith(signal))) {
-                onCloseLog();
-            }
-            if (end.value) {
-                if (lastContent.value == '') {
-                    content.value = res.data.content;
-                } else {
-                    content.value = lastContent.value + '\n' + res.data.content;
-                }
-            } else {
-                if (content.value == '') {
-                    content.value = res.data.content;
-                } else {
-                    content.value = content.value + '\n' + res.data.content;
-                }
-            }
-        }
-        end.value = res.data.end;
-        emit('update:hasContent', content.value !== '');
-        nextTick(() => {
-            const state = view.value.state;
-            view.value.dispatch({
-                selection: { anchor: state.doc.length, head: state.doc.length },
-            });
-            view.value.focus();
-            const firstLine = view.value.state.doc.line(view.value.state.doc.lines);
-            const { top } = view.value.lineBlockAt(firstLine.from);
-            scrollerElement.value.scrollTo({ top, behavior: 'instant' });
-        });
-    });
+};
+
+const changeLoading = () => {
+    loading.value = !loading.value;
+    emit('update:loading', loading.value);
+};
+
+const onDownload = async () => {
+    changeLoading();
+    downloadFile(logPath.value);
+    changeLoading();
 };
 
 const changeTail = (fromOutSide: boolean) => {
@@ -206,31 +139,129 @@ const changeTail = (fromOutSide: boolean) => {
     }
     if (tailLog.value) {
         timer = setInterval(() => {
-            getContent();
-        }, 1000 * 2);
+            getContent(false);
+        }, 1000 * 3);
     } else {
         onCloseLog();
     }
 };
 
-const onDownload = async () => {
-    changeLoading();
-    downloadFile(data.value.path);
-    changeLoading();
+const clearLog = (): void => {
+    logs.value = [];
+    readReq.page = 1;
+    lastLogs.value = [];
+};
+
+const getContent = async (pre: boolean) => {
+    if (isLoading.value) {
+        return;
+    }
+    readReq.id = props.config.id;
+    readReq.type = props.config.type;
+    readReq.name = props.config.name;
+    if (readReq.page < 1) {
+        readReq.page = 1;
+    }
+    isLoading.value = true;
+    emit('update:isReading', true);
+
+    const res = await ReadByLine(readReq);
+    logPath.value = res.data.path;
+    firstLoading.value = false;
+
+    if (!end.value && res.data.end) {
+        lastLogs.value = [...logs.value];
+    }
+    if (res.data.lines && res.data.lines.length > 0) {
+        res.data.lines = res.data.lines.map((line) =>
+            line
+                .replace(/\\u(\w{4})/g, function (match, grp) {
+                    return String.fromCharCode(parseInt(grp, 16));
+                })
+                .replace(/\x1B\[[0-?9;]*[mKhlGA]/g, ''),
+        );
+        const newLogs = res.data.lines;
+        if (newLogs.length === readReq.pageSize && readReq.page < res.data.total) {
+            readReq.page++;
+        }
+        if (
+            readReq.type == 'php' &&
+            logs.value.length > 0 &&
+            newLogs.length > 0 &&
+            newLogs[newLogs.length - 1] === logs.value[logs.value.length - 1]
+        ) {
+            isLoading.value = false;
+            return;
+        }
+
+        if (stopSignals.some((signal) => newLogs[newLogs.length - 1].endsWith(signal))) {
+            onCloseLog();
+        }
+        if (end.value) {
+            if ((logs.value.length = 0)) {
+                logs.value = newLogs;
+            } else {
+                logs.value = pre ? [...newLogs, ...lastLogs.value] : [...lastLogs.value, ...newLogs];
+            }
+        } else {
+            if ((logs.value.length = 0)) {
+                logs.value = newLogs;
+            } else {
+                logs.value = pre ? [...newLogs, ...logs.value] : [...logs.value, ...newLogs];
+            }
+        }
+
+        nextTick(() => {
+            if (pre) {
+                logContainer.value.scrollTop = 2000;
+            } else {
+                logContainer.value.scrollTop = totalHeight.value;
+                containerHeight.value = logContainer.value.getBoundingClientRect().height;
+            }
+        });
+    }
+
+    logCount.value = logs.value.length;
+    end.value = res.data.end;
+    emit('update:hasContent', logs.value.length > 0);
+    if (readReq.latest) {
+        readReq.page = res.data.total;
+        readReq.latest = false;
+        maxPage.value = res.data.total;
+        minPage.value = res.data.total;
+    }
+    if (logs.value && logs.value.length > 3000) {
+        if (pre) {
+            logs.value.splice(logs.value.length - readReq.pageSize, readReq.pageSize);
+            if (maxPage.value > 1) {
+                maxPage.value--;
+            }
+        } else {
+            logs.value.splice(0, readReq.pageSize);
+            if (minPage.value > 1) {
+                minPage.value++;
+            }
+        }
+    }
+    isLoading.value = false;
 };
 
 const onCloseLog = async () => {
-    emit('update:isReading', false);
     tailLog.value = false;
     clearInterval(Number(timer));
     timer = null;
+    isLoading.value = false;
+    emit('update:isReading', false);
 };
 
-function isScrolledToBottom(element: HTMLElement): boolean {
-    return element.scrollTop + element.clientHeight + 1 >= element.scrollHeight;
-}
+watch(
+    () => props.loading,
+    (newLoading) => {
+        loading.value = newLoading;
+    },
+);
 
-const init = () => {
+const init = async () => {
     if (props.config.tail) {
         tailLog.value = props.config.tail;
     } else {
@@ -239,30 +270,55 @@ const init = () => {
     if (tailLog.value) {
         changeTail(false);
     }
-    getContent();
+    readReq.latest = true;
+    await getContent(false);
+};
 
+onMounted(async () => {
+    firstLoading.value = true;
+    await init();
     nextTick(() => {
-        if (scrollerElement.value) {
-            scrollerElement.value.addEventListener('scroll', function () {
-                if (isScrolledToBottom(scrollerElement.value)) {
-                    getContent();
-                }
-            });
+        if (logContainer.value) {
+            logContainer.value.scrollTop = totalHeight.value;
+            containerHeight.value = logContainer.value.getBoundingClientRect().height;
         }
     });
-};
-
-const clearLog = (): void => {
-    content.value = '';
-};
+});
 
 onUnmounted(() => {
     onCloseLog();
 });
 
-onMounted(() => {
-    init();
-});
-
 defineExpose({ changeTail, onDownload, clearLog });
 </script>
+
+<style scoped>
+.log-container {
+    height: calc(100vh - 405px);
+    overflow-y: auto;
+    overflow-x: auto;
+    position: relative;
+    background-color: var(--panel-logs-bg-color);
+    margin-top: 10px;
+}
+
+.log-spacer {
+    position: relative;
+    width: 100%;
+}
+
+.log-item {
+    position: absolute;
+    width: 100%;
+    padding: 5px;
+    color: #f5f5f5;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+
+.log-item span {
+    font-size: 14px;
+    font-weight: 300;
+    color: #cccccc;
+}
+</style>
