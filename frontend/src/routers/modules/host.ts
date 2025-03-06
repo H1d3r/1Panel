@@ -1,13 +1,13 @@
 import { Layout } from '@/routers/constant';
 
 const hostRouter = {
-    sort: 6,
+    sort: 7,
     path: '/hosts',
     component: Layout,
     redirect: '/hosts/security',
     meta: {
         icon: 'p-host',
-        title: 'menu.host',
+        title: 'menu.system',
     },
     children: [
         {
@@ -31,7 +31,7 @@ const hostRouter = {
         },
         {
             path: '/hosts/monitor/setting',
-            name: 'MonitorSetting',
+            name: 'HostMonitorSetting',
             component: () => import('@/views/host/monitor/setting/index.vue'),
             hidden: true,
             meta: {
@@ -57,6 +57,16 @@ const hostRouter = {
             component: () => import('@/views/host/firewall/port/index.vue'),
             meta: {
                 title: 'menu.firewall',
+                requiresAuth: false,
+            },
+        },
+        {
+            path: '/hosts/firewall/forward',
+            name: 'FirewallForward',
+            component: () => import('@/views/host/firewall/forward/index.vue'),
+            hidden: true,
+            meta: {
+                activeMenu: '/hosts/firewall/port',
                 requiresAuth: false,
             },
         },

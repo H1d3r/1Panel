@@ -19,6 +19,7 @@ var whiteUrlList = map[string]struct{}{
 	"/api/v1/logs/operation":      {},
 	"/api/v1/logs/login":          {},
 	"/api/v1/auth/logout":         {},
+	"/api/v1/dashboard/current":   {},
 
 	"/api/v1/apps/installed/loadport": {},
 	"/api/v1/apps/installed/check":    {},
@@ -27,6 +28,14 @@ var whiteUrlList = map[string]struct{}{
 	"/api/v1/databases/variables":     {},
 	"/api/v1/databases/status":        {},
 	"/api/v1/databases/baseinfo":      {},
+
+	"/api/v1/waf/attack/stat":    {},
+	"/api/v1/waf/config/website": {},
+
+	"/api/v1/monitor/stat":         {},
+	"/api/v1/monitor/visitors":     {},
+	"/api/v1/monitor/visitors/loc": {},
+	"/api/v1/monitor/qps":          {},
 }
 
 func DemoHandle() gin.HandlerFunc {

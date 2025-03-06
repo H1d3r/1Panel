@@ -1,28 +1,39 @@
 <template>
     <div>
-        <LayoutContent v-loading="loading" :title="$t('terminal.quickCommand')">
+        <LayoutContent v-loading="loading" :title="$t('terminal.quickCommand', 2)">
             <template #prompt>
                 <el-alert type="info" :title="$t('terminal.quickCommandHelper')" :closable="false" />
             </template>
             <template #toolbar>
-                <el-button type="primary" @click="onCreate()">
-                    {{ $t('commons.button.create') }}{{ $t('terminal.quickCommand') }}
-                </el-button>
-                <el-button type="primary" plain @click="onOpenGroupDialog()">
-                    {{ $t('terminal.group') }}
-                </el-button>
-                <el-button type="primary" plain :disabled="selects.length === 0" @click="batchDelete(null)">
-                    {{ $t('commons.button.delete') }}
-                </el-button>
+                <div class="flex w-full flex-col gap-4 md:justify-between md:flex-row">
+                    <div class="flex flex-wrap gap-4">
+                        <el-button type="primary" @click="onCreate()">
+                            {{ $t('commons.button.create') }}
+                        </el-button>
+                        <el-button type="primary" plain @click="onOpenGroupDialog()">
+                            {{ $t('terminal.manageGroup') }}
+                        </el-button>
+                        <el-button type="primary" plain :disabled="selects.length === 0" @click="batchDelete(null)">
+                            {{ $t('commons.button.delete') }}
+                        </el-button>
+                    </div>
+                </div>
             </template>
             <template #search>
-                <el-select v-model="group" @change="search()" clearable class="p-w-200">
-                    <template #prefix>{{ $t('terminal.group') }}</template>
-                    <el-option :label="$t('commons.table.all')" value=""></el-option>
-                    <div v-for="item in groupList" :key="item.name">
-                        <el-option :value="item.id" :label="item.name" />
-                    </div>
-                </el-select>
+                <el-row :gutter="5">
+                    <el-col :xs="24" :sm="20" :md="20" :lg="20" :xl="20">
+                        <el-select v-model="group" @change="search()" clearable class="p-w-200">
+                            <template #prefix>{{ $t('terminal.group') }}</template>
+                            <el-option :label="$t('commons.table.all')" value=""></el-option>
+                            <div v-for="item in groupList" :key="item.name">
+                                <el-option :value="item.id" :label="item.name" />
+                            </div>
+                        </el-select>
+                    </el-col>
+                    <el-col :xs="24" :sm="4" :md="4" :lg="4" :xl="4">
+                        <TableSearch @search="search()" v-model:searchName="commandReq.name" />
+                    </el-col>
+                </el-row>
             </template>
             <template #main>
                 <ComplexTable
@@ -35,7 +46,7 @@
                     <el-table-column type="selection" fix />
                     <el-table-column
                         :label="$t('commons.table.name')"
-                        show-overflow-tooltip=""
+                        show-overflow-tooltip
                         min-width="100"
                         prop="name"
                         fix
@@ -50,7 +61,7 @@
                     />
                     <el-table-column
                         :label="$t('commons.table.group')"
-                        show-overflow-tooltip=""
+                        show-overflow-tooltip
                         min-width="100"
                         prop="groupBelong"
                         fix
@@ -59,10 +70,16 @@
                 </ComplexTable>
             </template>
         </LayoutContent>
-        <el-drawer v-model="cmdVisible" :destroy-on-close="true" :close-on-click-modal="false" size="30%">
+        <el-drawer
+            v-model="cmdVisible"
+            :destroy-on-close="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            size="30%"
+        >
             <template #header>
                 <DrawerHeader
-                    :header="$t('commons.button.' + operate) + $t('terminal.quickCommand')"
+                    :header="$t('commons.button.' + operate) + $t('terminal.quickCommand').toLowerCase()"
                     :back="handleClose"
                 />
             </template>
@@ -158,6 +175,10 @@ let commandInfo = reactive<Command.CommandOperate>({
     name: '',
     groupID: 0,
     command: '',
+});
+
+const commandReq = reactive({
+    name: '',
 });
 
 const cmdVisible = ref<boolean>(false);
@@ -274,6 +295,7 @@ const search = async (column?: any) => {
         info: info.value,
         orderBy: paginationConfig.orderBy,
         order: paginationConfig.order,
+        name: commandReq.name,
     };
     loading.value = true;
     await getCommandPage(params)

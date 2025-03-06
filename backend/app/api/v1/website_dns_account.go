@@ -10,11 +10,11 @@ import (
 
 // @Tags Website DNS
 // @Summary Page website dns accounts
-// @Description 获取网站 dns 列表分页
 // @Accept json
 // @Param request body dto.PageInfo true "request"
 // @Success 200 {object} dto.PageResult
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /websites/dns/search [post]
 func (b *BaseApi) PageWebsiteDnsAccount(c *gin.Context) {
 	var req dto.PageInfo
@@ -34,11 +34,11 @@ func (b *BaseApi) PageWebsiteDnsAccount(c *gin.Context) {
 
 // @Tags Website DNS
 // @Summary Create website dns account
-// @Description 创建网站 dns
 // @Accept json
 // @Param request body request.WebsiteDnsAccountCreate true "request"
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /websites/dns [post]
 // @x-panel-log {"bodyKeys":["name"],"paramKeys":[],"BeforeFunctions":[],"formatZH":"创建网站 dns [name]","formatEN":"Create website dns [name]"}
 func (b *BaseApi) CreateWebsiteDnsAccount(c *gin.Context) {
@@ -55,11 +55,11 @@ func (b *BaseApi) CreateWebsiteDnsAccount(c *gin.Context) {
 
 // @Tags Website DNS
 // @Summary Update website dns account
-// @Description 更新网站 dns
 // @Accept json
 // @Param request body request.WebsiteDnsAccountUpdate true "request"
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /websites/dns/update [post]
 // @x-panel-log {"bodyKeys":["name"],"paramKeys":[],"BeforeFunctions":[],"formatZH":"更新网站 dns [name]","formatEN":"Update website dns [name]"}
 func (b *BaseApi) UpdateWebsiteDnsAccount(c *gin.Context) {
@@ -76,11 +76,11 @@ func (b *BaseApi) UpdateWebsiteDnsAccount(c *gin.Context) {
 
 // @Tags Website DNS
 // @Summary Delete website dns account
-// @Description 删除网站 dns
 // @Accept json
 // @Param request body request.WebsiteResourceReq true "request"
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /websites/dns/del [post]
 // @x-panel-log {"bodyKeys":["id"],"paramKeys":[],"BeforeFunctions":[{"input_column":"id","input_value":"id","isList":false,"db":"website_dns_accounts","output_column":"name","output_value":"name"}],"formatZH":"删除网站 dns [name]","formatEN":"Delete website dns [name]"}
 func (b *BaseApi) DeleteWebsiteDnsAccount(c *gin.Context) {

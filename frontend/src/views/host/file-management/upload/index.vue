@@ -5,6 +5,7 @@
         size="40%"
         :destroy-on-close="true"
         :close-on-click-modal="false"
+        :close-on-press-escape="false"
     >
         <template #header>
             <DrawerHeader :header="$t('file.upload')" :back="handleClose" />
@@ -12,9 +13,9 @@
         <div class="button-container">
             <div>
                 <el-button type="primary" @click="upload('file')">
-                    {{ $t('file.upload') }}{{ $t('file.file') }}
+                    {{ $t('file.uploadFile') }}
                 </el-button>
-                <el-button type="primary" @click="upload('dir')">{{ $t('file.upload') }}{{ $t('file.dir') }}</el-button>
+                <el-button type="primary" @click="upload('dir')">{{ $t('file.uploadDirectory') }}</el-button>
             </div>
             <el-button @click="clearFiles">{{ $t('file.clearList') }}</el-button>
         </div>
@@ -38,7 +39,7 @@
             ref="uploadRef"
             :on-change="fileOnChange"
             :on-exceed="handleExceed"
-            :on-success="hadleSuccess"
+            :on-success="handleSuccess"
             :show-file-list="false"
             multiple
             v-model:file-list="uploaderFiles"
@@ -84,18 +85,20 @@
                 </el-button>
             </span>
         </template>
+        <ExistFileDialog ref="dialogExistFileRef" />
     </el-drawer>
 </template>
 
 <script setup lang="ts">
 import { nextTick, reactive, ref } from 'vue';
 import { UploadFile, UploadFiles, UploadInstance, UploadProps, UploadRawFile } from 'element-plus';
-import { ChunkUploadFileData, UploadFileData } from '@/api/modules/files';
+import { BatchCheckFiles, ChunkUploadFileData, UploadFileData } from '@/api/modules/files';
 import i18n from '@/lang';
 import DrawerHeader from '@/components/drawer-header/index.vue';
 import { MsgError, MsgSuccess, MsgWarning } from '@/utils/message';
-import { Close } from '@element-plus/icons-vue';
+import { Close, Document, UploadFilled } from '@element-plus/icons-vue';
 import { TimeoutEnum } from '@/enums/http-enum';
+import ExistFileDialog from '@/components/exist-file/index.vue';
 
 interface UploadFileProps {
     path: string;
@@ -107,31 +110,27 @@ let uploadPercent = ref(0);
 const open = ref(false);
 const path = ref();
 let uploadHelper = ref('');
+const dialogExistFileRef = ref();
 
 const em = defineEmits(['close']);
 const handleClose = () => {
     open.value = false;
-    uploadRef.value!.clearFiles();
+    clearFiles();
     em('close', false);
 };
 const state = reactive({
     uploadEle: null,
 });
 const uploaderFiles = ref<UploadFiles>([]);
-const isUploadFolder = ref(false);
-const hoverIndex = ref(null);
-const uploadType = ref('file');
+const hoverIndex = ref<number | null>(null);
 const tmpFiles = ref<UploadFiles>([]);
 const breakFlag = ref(false);
+const CHUNK_SIZE = 1024 * 1024 * 5;
+const MAX_SINGLE_FILE_SIZE = 1024 * 1024 * 10;
 
 const upload = (command: string) => {
-    uploadType.value = command;
-    if (command == 'dir') {
-        state.uploadEle.webkitdirectory = true;
-    } else {
-        state.uploadEle.webkitdirectory = false;
-    }
-    isUploadFolder.value = true;
+    state.uploadEle.webkitdirectory = command == 'dir';
+    uploadRef.value.$el.querySelector('input').value = '';
     uploadRef.value.$el.querySelector('input').click();
 };
 
@@ -151,15 +150,10 @@ const initTempFiles = () => {
 const handleDrop = async (event: DragEvent) => {
     initTempFiles();
     event.preventDefault();
-    const items = event.dataTransfer.items;
-
+    const items = event.dataTransfer?.items;
     if (items) {
-        for (let i = 0; i < items.length; i++) {
-            const entry = items[i].webkitGetAsEntry();
-            if (entry) {
-                await traverseFileTree(entry);
-            }
-        }
+        const entries = Array.from(items).map((item) => item.webkitGetAsEntry());
+        await Promise.all(entries.map((entry) => traverseFileTree(entry)));
         if (!breakFlag.value) {
             uploaderFiles.value = uploaderFiles.value.concat(tmpFiles.value);
         } else {
@@ -193,7 +187,9 @@ const convertFileToUploadFile = (file: File, path: string): UploadFile => {
 
 const traverseFileTree = async (item: any, path = '') => {
     path = path || '';
-
+    if (!item) {
+        return;
+    }
     if (item.isFile) {
         if (tmpFiles.value.length > 1000) {
             breakFlag.value = true;
@@ -211,7 +207,7 @@ const traverseFileTree = async (item: any, path = '') => {
         const dirReader = item.createReader();
         const readEntries = async () => {
             const entries = await new Promise<any[]>((resolve) => {
-                dirReader.readEntries((entries) => {
+                dirReader.readEntries((entries: any[] | PromiseLike<any[]>) => {
                     resolve(entries);
                 });
             });
@@ -220,8 +216,8 @@ const traverseFileTree = async (item: any, path = '') => {
                 return;
             }
 
-            for (let i = 0; i < entries.length; i++) {
-                await traverseFileTree(entries[i], path + item.name + '/');
+            for (const element of entries) {
+                await traverseFileTree(element, path + item.name + '/');
                 if (breakFlag.value) {
                     return;
                 }
@@ -232,7 +228,7 @@ const traverseFileTree = async (item: any, path = '') => {
     }
 };
 
-const handleDragleave = (event) => {
+const handleDragleave = (event: { preventDefault: () => void }) => {
     event.preventDefault();
 };
 
@@ -253,105 +249,143 @@ const fileOnChange = (_uploadFile: UploadFile, uploadFiles: UploadFiles) => {
 
 const clearFiles = () => {
     uploadRef.value!.clearFiles();
+    uploaderFiles.value = [];
 };
 
 const handleExceed: UploadProps['onExceed'] = () => {
-    uploadRef.value!.clearFiles();
+    clearFiles();
     MsgWarning(i18n.global.t('file.uploadOverLimit'));
 };
 
-const hadleSuccess: UploadProps['onSuccess'] = (res, file) => {
+const handleSuccess: UploadProps['onSuccess'] = (res, file) => {
     file.status = 'success';
 };
 
 const submit = async () => {
-    loading.value = true;
-    let success = 0;
     const files = uploaderFiles.value.slice();
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const fileSize = file.size;
-
-        uploadHelper.value = i18n.global.t('file.fileUploadStart', [file.name]);
-        if (fileSize <= 1024 * 1024 * 10) {
-            const formData = new FormData();
-            formData.append('file', file.raw);
-            if (file.raw.webkitRelativePath != '') {
-                formData.append('path', path.value + '/' + getPathWithoutFilename(file.raw.webkitRelativePath));
-            } else {
-                formData.append('path', path.value + '/' + getPathWithoutFilename(file.name));
+    const fileNamesWithPath = Array.from(
+        new Set(files.map((file) => `${path.value}/${file.raw.webkitRelativePath || file.name}`)),
+    );
+    const existFiles = await BatchCheckFiles(fileNamesWithPath);
+    if (existFiles.data.length > 0) {
+        const fileSizeMap = new Map(
+            files.map((file) => [`${path.value}/${file.raw.webkitRelativePath || file.name}`, file.size]),
+        );
+        existFiles.data.forEach((file) => {
+            if (fileSizeMap.has(file.path)) {
+                file.uploadSize = fileSizeMap.get(file.path);
             }
-            formData.append('overwrite', 'True');
-            uploadPercent.value = 0;
-            await UploadFileData(formData, {
-                onUploadProgress: (progressEvent) => {
-                    const progress = Math.round((progressEvent.loaded / progressEvent.total) * 100);
-                    uploadPercent.value = progress;
-                },
-                timeout: 40000,
-            });
-            success++;
-            uploaderFiles.value[i].status = 'success';
-        } else {
-            const CHUNK_SIZE = 1024 * 1024 * 5;
-            const chunkCount = Math.ceil(fileSize / CHUNK_SIZE);
-            let uploadedChunkCount = 0;
-            for (let c = 0; c < chunkCount; c++) {
-                const start = c * CHUNK_SIZE;
-                const end = Math.min(start + CHUNK_SIZE, fileSize);
-                const chunk = file.raw.slice(start, end);
-                const formData = new FormData();
+        });
+        dialogExistFileRef.value.acceptParams({
+            paths: existFiles.data,
+            onConfirm: handleFileUpload,
+        });
+    } else {
+        await uploadFile(files);
+    }
+};
 
-                formData.append('filename', getFilenameFromPath(file.name));
-                if (file.raw.webkitRelativePath != '') {
-                    formData.append('path', path.value + '/' + getPathWithoutFilename(file.raw.webkitRelativePath));
-                } else {
-                    formData.append('path', path.value + '/' + getPathWithoutFilename(file.name));
-                }
-                formData.append('chunk', chunk);
-                formData.append('chunkIndex', c.toString());
-                formData.append('chunkCount', chunkCount.toString());
+const handleFileUpload = (action: 'skip' | 'overwrite', skippedPaths: string[] = []) => {
+    const files = uploaderFiles.value.slice();
+    if (action === 'skip') {
+        const filteredFiles = files.filter(
+            (file) => !skippedPaths.includes(`${path.value}/${file.raw.webkitRelativePath || file.name}`),
+        );
+        uploaderFiles.value = filteredFiles;
+        uploadFile(filteredFiles);
+    } else if (action === 'overwrite') {
+        uploadFile(files);
+    }
+};
 
-                try {
-                    await ChunkUploadFileData(formData, {
-                        onUploadProgress: (progressEvent) => {
-                            const progress = Math.round(
-                                ((uploadedChunkCount + progressEvent.loaded / progressEvent.total) * 100) / chunkCount,
-                            );
-                            uploadPercent.value = progress;
-                        },
-                        timeout: TimeoutEnum.T_60S,
-                    });
-                    uploadedChunkCount++;
-                } catch (error) {
-                    uploaderFiles.value[i].status = 'fail';
-                    break;
-                }
-                if (uploadedChunkCount == chunkCount) {
-                    success++;
-                    uploaderFiles.value[i].status = 'success';
-                    break;
-                }
+const uploadFile = async (files: any[]) => {
+    if (files.length == 0) {
+        clearFiles();
+    } else {
+        loading.value = true;
+        let successCount = 0;
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            uploadHelper.value = i18n.global.t('file.fileUploadStart', [file.name]);
+
+            let isSuccess =
+                file.size <= MAX_SINGLE_FILE_SIZE ? await uploadSingleFile(file) : await uploadLargeFile(file);
+
+            if (isSuccess) {
+                successCount++;
+                uploaderFiles.value[i].status = 'success';
+            } else {
+                uploaderFiles.value[i].status = 'fail';
             }
         }
 
-        if (i == files.length - 1) {
-            loading.value = false;
-            uploadHelper.value = '';
-            if (success == files.length) {
-                uploadRef.value!.clearFiles();
-                uploaderFiles.value = [];
-                MsgSuccess(i18n.global.t('file.uploadSuccess'));
-            }
+        loading.value = false;
+        uploadHelper.value = '';
+
+        if (successCount === files.length) {
+            clearFiles();
+            MsgSuccess(i18n.global.t('file.uploadSuccess'));
         }
     }
+};
+
+const uploadSingleFile = async (file: { raw: string | Blob }) => {
+    const formData = new FormData();
+    formData.append('file', file.raw);
+    formData.append('path', getUploadPath(file));
+    formData.append('overwrite', 'True');
+    uploadPercent.value = 0;
+    await UploadFileData(formData, {
+        onUploadProgress: (progressEvent) => {
+            uploadPercent.value = Math.round((progressEvent.loaded / progressEvent.total) * 100);
+        },
+        timeout: 40000,
+    });
+    return true;
+};
+
+const uploadLargeFile = async (file: { size: any; raw: string | Blob; name: string }) => {
+    const fileSize = file.size;
+    const chunkCount = Math.ceil(fileSize / CHUNK_SIZE);
+    let uploadedChunkCount = 0;
+    for (let c = 0; c < chunkCount; c++) {
+        const start = c * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, fileSize);
+        const chunk = file.raw.slice(start, end);
+        const formData = new FormData();
+        formData.append('filename', getFilenameFromPath(file.name));
+        formData.append('path', getUploadPath(file));
+        formData.append('chunk', chunk);
+        formData.append('chunkIndex', c.toString());
+        formData.append('chunkCount', chunkCount.toString());
+
+        try {
+            await ChunkUploadFileData(formData, {
+                onUploadProgress: (progressEvent) => {
+                    uploadPercent.value = Math.round(
+                        ((uploadedChunkCount + progressEvent.loaded / progressEvent.total) * 100) / chunkCount,
+                    );
+                },
+                timeout: TimeoutEnum.T_60S,
+            });
+            uploadedChunkCount++;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    return uploadedChunkCount === chunkCount;
+};
+
+const getUploadPath = (file) => {
+    return `${path.value}/${getPathWithoutFilename(file.raw.webkitRelativePath || file.name)}`;
 };
 
 const getPathWithoutFilename = (path: string) => {
     return path ? path.split('/').slice(0, -1).join('/') : path;
 };
 
-const getFilenameFromPath = (path) => {
+const getFilenameFromPath = (path: string) => {
     return path ? path.split('/').pop() : path;
 };
 
@@ -362,8 +396,7 @@ const acceptParams = (props: UploadFileProps) => {
     uploadHelper.value = '';
 
     nextTick(() => {
-        const uploadEle = document.querySelector('.el-upload__input');
-        state.uploadEle = uploadEle;
+        state.uploadEle = document.querySelector('.el-upload__input');
     });
 };
 

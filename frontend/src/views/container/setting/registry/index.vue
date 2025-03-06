@@ -1,6 +1,12 @@
 <template>
     <div>
-        <el-drawer v-model="drawerVisible" :destroy-on-close="true" :close-on-click-modal="false" size="30%">
+        <el-drawer
+            v-model="drawerVisible"
+            :destroy-on-close="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            size="30%"
+        >
             <template #header>
                 <DrawerHeader :header="$t('container.registries')" :back="handleClose" />
             </template>
@@ -46,6 +52,7 @@ import ConfirmDialog from '@/components/confirm-dialog/index.vue';
 import { updateDaemonJson } from '@/api/modules/container';
 import DrawerHeader from '@/components/drawer-header/index.vue';
 import { FormInstance } from 'element-plus';
+import { emptyLineFilter } from '@/utils/util';
 
 const emit = defineEmits<{ (e: 'search'): void }>();
 
@@ -97,7 +104,7 @@ const onSave = async () => {
 
 const onSubmit = async () => {
     loading.value = true;
-    await updateDaemonJson('Registries', form.registries.replaceAll('\n', ','))
+    await updateDaemonJson('Registries', emptyLineFilter(form.registries, '\n').replaceAll('\n', ','))
         .then(() => {
             loading.value = false;
             handleClose();

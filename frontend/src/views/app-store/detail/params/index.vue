@@ -195,6 +195,8 @@ const handleParams = () => {
                 if (p.rule && p.rule != '') {
                     rules[p.envKey].push(Rules[p.rule]);
                 }
+            } else {
+                delete rules[p.envKey];
             }
             if (p.type === 'apps') {
                 getServices(p.child.envKey, p.default, p);
@@ -246,6 +248,10 @@ const changeService = (value: string, services: App.AppService[]) => {
 
 const getLabel = (row: ParamObj): string => {
     const language = localStorage.getItem('lang') || 'zh';
+    let lang = language == 'tw' ? 'zh-Hant' : language;
+    if (row.label && row.label[lang] != '') {
+        return row.label[lang];
+    }
     if (language == 'zh' || language == 'tw') {
         return row.labelZh;
     } else {

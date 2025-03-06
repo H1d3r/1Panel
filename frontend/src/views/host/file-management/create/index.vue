@@ -4,6 +4,7 @@
         :before-close="handleClose"
         :destroy-on-close="true"
         :close-on-click-modal="false"
+        :close-on-press-escape="false"
         size="40%"
     >
         <template #header>
@@ -22,7 +23,7 @@
                     @submit.enter.prevent
                 >
                     <el-form-item :label="$t('commons.table.name')" prop="name">
-                        <el-input v-model.trim="addForm.name" />
+                        <el-input v-model="addForm.name" />
                     </el-form-item>
                     <el-form-item v-if="!addForm.isDir">
                         <el-checkbox v-model="addForm.isLink" :label="$t('file.link')"></el-checkbox>
@@ -41,7 +42,11 @@
                         </el-input>
                     </el-form-item>
                     <el-form-item>
-                        <el-checkbox v-if="addForm.isDir" v-model="setRole" :label="$t('file.setRole')"></el-checkbox>
+                        <el-checkbox
+                            v-if="addForm.isDir"
+                            v-model="setRole"
+                            :label="$t('file.editPermissions')"
+                        ></el-checkbox>
                     </el-form-item>
                 </el-form>
                 <FileRole v-if="setRole" :mode="'0755'" @get-mode="getMode" :key="open.toString()"></FileRole>
@@ -104,9 +109,9 @@ const getMode = (val: number) => {
 
 let getPath = computed(() => {
     if (addForm.path.endsWith('/')) {
-        return addForm.path + addForm.name;
+        return addForm.path + addForm.name.trim();
     } else {
-        return addForm.path + '/' + addForm.name;
+        return addForm.path + '/' + addForm.name.trim();
     }
 });
 
@@ -132,6 +137,7 @@ const submit = async (formEl: FormInstance | undefined) => {
         if (!setRole.value) {
             addItem['mode'] = undefined;
         }
+        addItem['name'] = addForm.name.trim();
         CreateFile(addItem as File.FileCreate)
             .then(() => {
                 MsgSuccess(i18n.global.t('commons.msg.createSuccess'));

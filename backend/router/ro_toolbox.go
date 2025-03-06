@@ -36,5 +36,28 @@ func (s *ToolboxRouter) InitRouter(Router *gin.RouterGroup) {
 		toolboxRouter.POST("/fail2ban/operate/sshd", baseApi.OperateSSHD)
 		toolboxRouter.POST("/fail2ban/update", baseApi.UpdateFail2BanConf)
 		toolboxRouter.POST("/fail2ban/update/byconf", baseApi.UpdateFail2BanConfByFile)
+
+		toolboxRouter.GET("/ftp/base", baseApi.LoadFtpBaseInfo)
+		toolboxRouter.POST("/ftp/log/search", baseApi.LoadFtpLogInfo)
+		toolboxRouter.POST("/ftp/operate", baseApi.OperateFtp)
+		toolboxRouter.POST("/ftp/search", baseApi.SearchFtp)
+		toolboxRouter.POST("/ftp", baseApi.CreateFtp)
+		toolboxRouter.POST("/ftp/update", baseApi.UpdateFtp)
+		toolboxRouter.POST("/ftp/del", baseApi.DeleteFtp)
+		toolboxRouter.POST("/ftp/sync", baseApi.SyncFtp)
+
+		toolboxRouter.POST("/clam/search", baseApi.SearchClam)
+		toolboxRouter.POST("/clam/record/search", baseApi.SearchClamRecord)
+		toolboxRouter.POST("/clam/record/clean", baseApi.CleanClamRecord)
+		toolboxRouter.POST("/clam/record/log", baseApi.LoadClamRecordLog)
+		toolboxRouter.POST("/clam/file/search", baseApi.SearchClamFile)
+		toolboxRouter.POST("/clam/file/update", baseApi.UpdateFile)
+		toolboxRouter.POST("/clam", baseApi.CreateClam)
+		toolboxRouter.POST("/clam/base", baseApi.LoadClamBaseInfo)
+		toolboxRouter.POST("/clam/operate", baseApi.OperateClam)
+		toolboxRouter.POST("/clam/update", baseApi.UpdateClam)
+		toolboxRouter.POST("/clam/status/update", baseApi.UpdateClamStatus)
+		toolboxRouter.POST("/clam/del", baseApi.DeleteClam)
+		toolboxRouter.POST("/clam/handle", baseApi.HandleClamScan)
 	}
 }

@@ -2,6 +2,8 @@ package service
 
 import (
 	"fmt"
+	"github.com/1Panel-dev/1Panel/backend/utils/geo"
+	"github.com/gin-gonic/gin"
 	"os"
 	"os/user"
 	"path"
@@ -17,7 +19,6 @@ import (
 	"github.com/1Panel-dev/1Panel/backend/utils/cmd"
 	"github.com/1Panel-dev/1Panel/backend/utils/common"
 	"github.com/1Panel-dev/1Panel/backend/utils/files"
-	"github.com/1Panel-dev/1Panel/backend/utils/qqwry"
 	"github.com/1Panel-dev/1Panel/backend/utils/systemctl"
 	"github.com/pkg/errors"
 )
@@ -33,7 +34,7 @@ type ISSHService interface {
 	Update(req dto.SSHUpdate) error
 	GenerateSSH(req dto.GenerateSSH) error
 	LoadSSHSecret(mode string) (string, error)
-	LoadLog(req dto.SearchSSHLog) (*dto.SSHLog, error)
+	LoadLog(c *gin.Context, req dto.SearchSSHLog) (*dto.SSHLog, error)
 
 	LoadSSHConf() (string, error)
 }
@@ -62,7 +63,9 @@ func (u *SSHService) GetSSHInfo() (*dto.SSHInfo, error) {
 		active, err := systemctl.IsActive(serviceName)
 		if !active {
 			data.Status = constant.StatusDisable
-			data.Message = err.Error()
+			if err != nil {
+				data.Message = err.Error()
+			}
 		} else {
 			data.Status = constant.StatusEnable
 		}
@@ -122,6 +125,16 @@ func (u *SSHService) OperateSSH(operation string) error {
 	if operation == "enable" || operation == "disable" {
 		serviceName += ".service"
 	}
+	if operation == "stop" {
+		isSocketActive, _ := systemctl.IsActive(serviceName + ".socket")
+		if isSocketActive {
+			std, err := cmd.Execf("%s systemctl stop %s", sudo, serviceName+".socket")
+			if err != nil {
+				global.LOG.Errorf("handle systemctl stop %s.socket failed, err: %v", serviceName, std)
+			}
+		}
+	}
+
 	stdout, err := cmd.Execf("%s systemctl %s %s", sudo, operation, serviceName)
 	if err != nil {
 		if strings.Contains(stdout, "alias name or linked unit file") {
@@ -218,7 +231,7 @@ func (u *SSHService) GenerateSSH(req dto.GenerateSSH) error {
 	}
 	secretFile := fmt.Sprintf("%s/.ssh/id_item_%s", currentUser.HomeDir, req.EncryptionMode)
 	secretPubFile := fmt.Sprintf("%s/.ssh/id_item_%s.pub", currentUser.HomeDir, req.EncryptionMode)
-	authFile := currentUser.HomeDir + "/.ssh/authorized_keys"
+	authFilePath := currentUser.HomeDir + "/.ssh/authorized_keys"
 
 	command := fmt.Sprintf("ssh-keygen -t %s -f %s/.ssh/id_item_%s | echo y", req.EncryptionMode, currentUser.HomeDir, req.EncryptionMode)
 	if len(req.Password) != 0 {
@@ -235,8 +248,12 @@ func (u *SSHService) GenerateSSH(req dto.GenerateSSH) error {
 		_ = os.Remove(secretPubFile)
 	}()
 
-	if _, err := os.Stat(authFile); err != nil {
-		_, _ = os.Create(authFile)
+	if _, err := os.Stat(authFilePath); err != nil && errors.Is(err, os.ErrNotExist) {
+		authFile, err := os.Create(authFilePath)
+		if err != nil {
+			return err
+		}
+		defer authFile.Close()
 	}
 	stdout1, err := cmd.Execf("cat %s >> %s/.ssh/authorized_keys", secretPubFile, currentUser.HomeDir)
 	if err != nil {
@@ -273,7 +290,7 @@ type sshFileItem struct {
 	Year int
 }
 
-func (u *SSHService) LoadLog(req dto.SearchSSHLog) (*dto.SSHLog, error) {
+func (u *SSHService) LoadLog(c *gin.Context, req dto.SearchSSHLog) (*dto.SSHLog, error) {
 	var fileList []sshFileItem
 	var data dto.SSHLog
 	baseDir := "/var/log"
@@ -306,11 +323,7 @@ func (u *SSHService) LoadLog(req dto.SearchSSHLog) (*dto.SSHLog, error) {
 
 	showCountFrom := (req.Page - 1) * req.PageSize
 	showCountTo := req.Page * req.PageSize
-	nyc, _ := time.LoadLocation(common.LoadTimeZone())
-	qqWry, err := qqwry.NewQQwry()
-	if err != nil {
-		global.LOG.Errorf("load qqwry datas failed: %s", err)
-	}
+	nyc, _ := time.LoadLocation(common.LoadTimeZoneByCmd())
 	for _, file := range fileList {
 		commandItem := ""
 		if strings.HasPrefix(path.Base(file.Name), "secure") {
@@ -333,7 +346,7 @@ func (u *SSHService) LoadLog(req dto.SearchSSHLog) (*dto.SSHLog, error) {
 				commandItem = fmt.Sprintf("cat %s | grep -aE \"(Failed password for|Connection closed by authenticating user|Accepted)\" %s", file.Name, command)
 			}
 		}
-		dataItem, successCount, failedCount := loadSSHData(commandItem, showCountFrom, showCountTo, file.Year, qqWry, nyc)
+		dataItem, successCount, failedCount := loadSSHData(c, commandItem, showCountFrom, showCountTo, file.Year, nyc)
 		data.FailedCount += failedCount
 		data.TotalCount += successCount + failedCount
 		showCountFrom = showCountFrom - (successCount + failedCount)
@@ -406,7 +419,7 @@ func updateSSHConf(oldFiles []string, param string, value string) []string {
 	return newFiles
 }
 
-func loadSSHData(command string, showCountFrom, showCountTo, currentYear int, qqWry *qqwry.QQwry, nyc *time.Location) ([]dto.SSHHistory, int, int) {
+func loadSSHData(c *gin.Context, command string, showCountFrom, showCountTo, currentYear int, nyc *time.Location) ([]dto.SSHHistory, int, int) {
 	var (
 		datas        []dto.SSHHistory
 		successCount int
@@ -424,7 +437,7 @@ func loadSSHData(command string, showCountFrom, showCountTo, currentYear int, qq
 			itemData = loadFailedSecureDatas(lines[i])
 			if len(itemData.Address) != 0 {
 				if successCount+failedCount >= showCountFrom && successCount+failedCount < showCountTo {
-					itemData.Area = qqWry.Find(itemData.Address).Area
+					itemData.Area, _ = geo.GetIPLocation(itemData.Address, common.GetLang(c))
 					itemData.Date = loadDate(currentYear, itemData.DateStr, nyc)
 					datas = append(datas, itemData)
 				}
@@ -434,7 +447,7 @@ func loadSSHData(command string, showCountFrom, showCountTo, currentYear int, qq
 			itemData = loadFailedAuthDatas(lines[i])
 			if len(itemData.Address) != 0 {
 				if successCount+failedCount >= showCountFrom && successCount+failedCount < showCountTo {
-					itemData.Area = qqWry.Find(itemData.Address).Area
+					itemData.Area, _ = geo.GetIPLocation(itemData.Address, common.GetLang(c))
 					itemData.Date = loadDate(currentYear, itemData.DateStr, nyc)
 					datas = append(datas, itemData)
 				}
@@ -444,7 +457,7 @@ func loadSSHData(command string, showCountFrom, showCountTo, currentYear int, qq
 			itemData = loadSuccessDatas(lines[i])
 			if len(itemData.Address) != 0 {
 				if successCount+failedCount >= showCountFrom && successCount+failedCount < showCountTo {
-					itemData.Area = qqWry.Find(itemData.Address).Area
+					itemData.Area, _ = geo.GetIPLocation(itemData.Address, common.GetLang(c))
 					itemData.Date = loadDate(currentYear, itemData.DateStr, nyc)
 					datas = append(datas, itemData)
 				}
@@ -479,9 +492,12 @@ func loadFailedAuthDatas(line string) dto.SSHHistory {
 		return data
 	}
 	data.DateStr = dataStr
-	if index == 2 {
+	switch index {
+	case 1:
+		data.User = parts[9]
+	case 2:
 		data.User = parts[10]
-	} else {
+	default:
 		data.User = parts[7]
 	}
 	data.AuthMode = parts[6+index]
@@ -542,15 +558,23 @@ func loadDate(currentYear int, DateStr string, nyc *time.Location) time.Time {
 }
 
 func analyzeDateStr(parts []string) (int, string) {
-	t, err := time.Parse("2006-01-02T15:04:05.999999-07:00", parts[0])
-	if err != nil {
+	t, err := time.Parse(time.RFC3339Nano, parts[0])
+	if err == nil {
+		if len(parts) < 12 {
+			return 0, ""
+		}
+		return 0, t.Format("2006 Jan 2 15:04:05")
+	}
+	t, err = time.Parse(constant.DateTimeLayout, fmt.Sprintf("%s %s", parts[0], parts[1]))
+	if err == nil {
 		if len(parts) < 14 {
 			return 0, ""
 		}
-		return 2, fmt.Sprintf("%s %s %s", parts[0], parts[1], parts[2])
+		return 1, t.Format("2006 Jan 2 15:04:05")
 	}
-	if len(parts) < 12 {
+
+	if len(parts) < 14 {
 		return 0, ""
 	}
-	return 0, t.Format("2006 Jan 2 15:04:05")
+	return 2, fmt.Sprintf("%s %s %s", parts[0], parts[1], parts[2])
 }
