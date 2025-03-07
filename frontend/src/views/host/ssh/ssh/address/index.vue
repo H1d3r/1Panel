@@ -5,6 +5,7 @@
             :destroy-on-close="true"
             @close="handleClose"
             :close-on-click-modal="false"
+            :close-on-press-escape="false"
             size="30%"
         >
             <template #header>
@@ -20,7 +21,7 @@
             >
                 <el-row type="flex" justify="center">
                     <el-col :span="22">
-                        <el-alert class="common-prompt" :closable="false" type="error">
+                        <el-alert class="common-prompt" :closable="false" type="warning">
                             <template #default>
                                 <span>
                                     {{ $t('ssh.listenHelper', [form.port]) }}

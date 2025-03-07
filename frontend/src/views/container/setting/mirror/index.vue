@@ -1,6 +1,12 @@
 <template>
     <div>
-        <el-drawer v-model="drawerVisible" :destroy-on-close="true" :close-on-click-modal="false" size="30%">
+        <el-drawer
+            v-model="drawerVisible"
+            :destroy-on-close="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            size="30%"
+        >
             <template #header>
                 <DrawerHeader :header="$t('container.mirrors')" :back="handleClose" />
             </template>
@@ -46,6 +52,7 @@ import ConfirmDialog from '@/components/confirm-dialog/index.vue';
 import { updateDaemonJson } from '@/api/modules/container';
 import DrawerHeader from '@/components/drawer-header/index.vue';
 import { FormInstance } from 'element-plus';
+import { emptyLineFilter } from '@/utils/util';
 
 const emit = defineEmits<{ (e: 'search'): void }>();
 
@@ -67,7 +74,7 @@ const rules = reactive({
 
 function checkMirrors(rule: any, value: any, callback: any) {
     if (form.mirrors !== '') {
-        const reg = /^https?:\/\/[a-zA-Z0-9./-]+$/;
+        const reg = /^https?:\/\/[a-zA-Z0-9.-]+(:[0-9]{1,5})?(\/[a-zA-Z0-9./-]*)?$/;
         let mirrors = form.mirrors.split('\n');
         for (const item of mirrors) {
             if (item === '') {
@@ -101,7 +108,7 @@ const onSave = async (formEl: FormInstance | undefined) => {
 
 const onSubmit = async () => {
     loading.value = true;
-    await updateDaemonJson('Mirrors', form.mirrors.replaceAll('\n', ','))
+    await updateDaemonJson('Mirrors', emptyLineFilter(form.mirrors, '\n').replaceAll('\n', ','))
         .then(() => {
             loading.value = false;
             emit('search');

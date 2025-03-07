@@ -1,7 +1,7 @@
 <template>
     <div v-loading="loading">
         <div v-show="isOnDetail">
-            <ComposeDetail @back="backList" ref="composeDetailRef" />
+            <ComposeDetail ref="composeDetailRef" />
         </div>
         <el-card v-if="dockerStatus != 'Running'" class="mask-prompt">
             <span>{{ $t('container.serviceUnavailable') }}</span>
@@ -9,33 +9,23 @@
             <span>{{ $t('container.startIn') }}</span>
         </el-card>
 
-        <LayoutContent v-if="!isOnDetail" :title="$t('container.compose')" :class="{ mask: dockerStatus != 'Running' }">
-            <template #prompt>
-                <el-alert type="info" :closable="false">
-                    <template #title>
-                        <span class="flx-align-center">
-                            <span>{{ $t('container.composeHelper', [baseDir]) }}</span>
-                            <el-button type="primary" link @click="toFolder">
-                                <el-icon>
-                                    <FolderOpened />
-                                </el-icon>
-                            </el-button>
-                        </span>
-                    </template>
-                </el-alert>
-            </template>
+        <LayoutContent
+            v-if="!isOnDetail"
+            :title="$t('container.compose', 2)"
+            :class="{ mask: dockerStatus != 'Running' }"
+        >
             <template #toolbar>
-                <el-row>
-                    <el-col :span="16">
+                <div class="flex justify-between gap-2 flex-wrap sm:flex-row">
+                    <div class="flex flex-wrap gap-3">
                         <el-button type="primary" @click="onOpenDialog()">
                             {{ $t('container.createCompose') }}
                         </el-button>
-                    </el-col>
-                    <el-col :span="8">
+                    </div>
+                    <div class="flex flex-wrap gap-3">
                         <TableSetting @search="search()" />
                         <TableSearch @search="search()" v-model:searchName="searchName" />
-                    </el-col>
-                </el-row>
+                    </div>
+                </div>
             </template>
             <template #main>
                 <ComplexTable
@@ -44,44 +34,64 @@
                     :data="data"
                     @search="search"
                 >
-                    <el-table-column :label="$t('commons.table.name')" width="170" prop="name" fix>
+                    <el-table-column
+                        :label="$t('commons.table.name')"
+                        width="170"
+                        prop="name"
+                        sortable
+                        fix
+                        show-overflow-tooltip
+                    >
                         <template #default="{ row }">
-                            <Tooltip @click="loadDetail(row)" :text="row.name" />
+                            <el-text type="primary" class="cursor-pointer" @click="loadDetail(row)">
+                                {{ row.name }}
+                            </el-text>
                         </template>
                     </el-table-column>
-                    <el-table-column :label="$t('container.from')" prop="createdBy" min-width="80" fix>
+                    <el-table-column :label="$t('container.from')" prop="createdBy" min-width="120" fix>
                         <template #default="{ row }">
                             <span v-if="row.createdBy === ''">{{ $t('container.local') }}</span>
                             <span v-if="row.createdBy === 'Apps'">{{ $t('container.apps') }}</span>
                             <span v-if="row.createdBy === '1Panel'">1Panel</span>
                         </template>
                     </el-table-column>
-                    <el-table-column
-                        :label="$t('container.containerNumber')"
-                        prop="containerNumber"
-                        min-width="80"
-                        fix
-                    />
-                    <el-table-column :label="$t('commons.table.createdAt')" prop="createdAt" min-width="80" fix />
+                    <el-table-column :label="$t('container.composeDirectory')" min-width="100" fix>
+                        <template #default="{ row }">
+                            <el-button type="primary" link @click="toComposeFolder(row)">
+                                <el-icon>
+                                    <FolderOpened />
+                                </el-icon>
+                            </el-button>
+                        </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('container.containerStatus')" min-width="200" fix>
+                        <template #default="scope">
+                            <div>
+                                {{ getContainerStatus(scope.row.containers) }}
+                            </div>
+                        </template>
+                    </el-table-column>
+                    <el-table-column :label="$t('commons.table.createdAt')" prop="createdAt" min-width="180" fix />
                     <fu-table-operations
                         width="200px"
                         :ellipsis="10"
                         :buttons="buttons"
                         :label="$t('commons.table.operate')"
+                        :fixed="mobile ? false : 'right'"
                         fix
                     />
                 </ComplexTable>
             </template>
         </LayoutContent>
 
-        <EditDialog ref="dialogEditRef" />
+        <EditDialog @search="search" ref="dialogEditRef" />
         <CreateDialog @search="search" ref="dialogRef" />
         <DeleteDialog @search="search" ref="dialogDelRef" />
     </div>
 </template>
 
 <script lang="ts" setup>
-import { reactive, onMounted, ref } from 'vue';
+import { reactive, onMounted, ref, computed } from 'vue';
 import EditDialog from '@/views/container/compose/edit/index.vue';
 import CreateDialog from '@/views/container/compose/create/index.vue';
 import DeleteDialog from '@/views/container/compose/delete/index.vue';
@@ -89,15 +99,19 @@ import ComposeDetail from '@/views/container/compose/detail/index.vue';
 import { loadContainerLog, loadDockerStatus, searchCompose } from '@/api/modules/container';
 import i18n from '@/lang';
 import { Container } from '@/api/interface/container';
-import { loadBaseDir } from '@/api/modules/setting';
 import router from '@/routers';
+import { GlobalStore } from '@/store';
+const globalStore = GlobalStore();
+
+const mobile = computed(() => {
+    return globalStore.isMobile();
+});
 
 const data = ref();
 const selects = ref<any>([]);
 const loading = ref(false);
 
 const isOnDetail = ref(false);
-const baseDir = ref();
 
 const paginationConfig = reactive({
     cacheSizeKey: 'container-compose-page-size',
@@ -127,13 +141,8 @@ const goSetting = async () => {
     router.push({ name: 'ContainerSetting' });
 };
 
-const toFolder = async () => {
-    router.push({ path: '/hosts/files', query: { path: baseDir.value + '/docker/compose' } });
-};
-
-const loadPath = async () => {
-    const pathRes = await loadBaseDir();
-    baseDir.value = pathRes.data;
+const toComposeFolder = async (row: Container.ComposeInfo) => {
+    router.push({ path: '/hosts/files', query: { path: row.workdir } });
 };
 
 const search = async () => {
@@ -165,9 +174,16 @@ const loadDetail = async (row: Container.ComposeInfo) => {
     isOnDetail.value = true;
     composeDetailRef.value!.acceptParams(params);
 };
-const backList = async () => {
-    isOnDetail.value = false;
-    search();
+const getContainerStatus = (containers) => {
+    const safeContainers = containers || [];
+    const runningCount = safeContainers.filter((container) => container.state.toLowerCase() === 'running').length;
+    const totalCount = safeContainers.length;
+    const statusText = runningCount > 0 ? 'Running' : 'Exited';
+    if (statusText === 'Exited') {
+        return i18n.global.t('container.exited');
+    } else {
+        return i18n.global.t('container.running') + ` (${runningCount}/${totalCount})`;
+    }
 };
 
 const dialogRef = ref();
@@ -191,6 +207,8 @@ const onEdit = async (row: Container.ComposeInfo) => {
         name: row.name,
         path: row.path,
         content: res.data,
+        env: row.env,
+        createdBy: row.createdBy,
     };
     dialogEditRef.value!.acceptParams(params);
 };
@@ -216,7 +234,6 @@ const buttons = [
     },
 ];
 onMounted(() => {
-    loadPath();
     loadStatus();
 });
 </script>

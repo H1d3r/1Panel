@@ -10,6 +10,7 @@ export interface ThemeConfigProp {
     logo: string;
     logoWithText: string;
     favicon: string;
+    themeColor: string;
 }
 
 export interface GlobalState {
@@ -28,11 +29,17 @@ export interface GlobalState {
     device: DeviceType;
     lastFilePath: string;
     currentDB: string;
+    currentRedisDB: string;
     showEntranceWarn: boolean;
     defaultNetwork: string;
 
     isProductPro: boolean;
+    isIntl: boolean;
+    isTrial: boolean;
     productProExpires: number;
+    licenseVerify: string;
+
+    errStatus: string;
 }
 
 export interface MenuState {

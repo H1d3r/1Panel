@@ -1,64 +1,75 @@
 <template>
-    <div class="flx-center">
-        <span v-if="props.footer">
-            <el-button type="primary" link @click="toForum">
-                <span>{{ $t('setting.forum') }}</span>
-            </el-button>
-            <el-divider direction="vertical" />
-            <el-button type="primary" link @click="toDoc">
-                <span>{{ $t('setting.doc2') }}</span>
-            </el-button>
-            <el-divider direction="vertical" />
-            <el-button type="primary" link @click="toGithub">
-                <span>{{ $t('setting.project') }}</span>
-            </el-button>
-            <el-divider direction="vertical" />
-        </span>
-        <el-button type="primary" link @click="toHalo">
-            {{ isProductPro ? $t('license.pro') : $t('license.community') }}
-            <span class="version">{{ version }}</span>
-        </el-button>
-        <el-badge is-dot style="margin-left: -3px" v-if="version !== 'Waiting' && globalStore.hasNewVersion">
-            <el-button type="primary" link @click="onLoadUpgradeInfo">
-                <span>({{ $t('setting.hasNewVersion') }})</span>
-            </el-button>
-        </el-badge>
-        <el-button
-            v-if="version !== 'Waiting' && !globalStore.hasNewVersion"
-            type="primary"
-            link
-            @click="onLoadUpgradeInfo"
-        >
-            <span>({{ $t('setting.upgradeCheck') }})</span>
-        </el-button>
-        <el-tag v-if="version === 'Waiting'" round style="margin-left: 10px">{{ $t('setting.upgrading') }}</el-tag>
+    <div>
+        <div class="flex w-full flex-col gap-2 md:flex-row items-center">
+            <div class="flex flex-wrap items-center" v-if="props.footer">
+                <el-link type="primary" :underline="false" @click="toForum">
+                    <span class="font-normal">{{ $t('setting.forum') }}</span>
+                </el-link>
+                <el-divider direction="vertical" />
+                <el-link type="primary" :underline="false" @click="toDoc">
+                    <span class="font-normal">{{ $t('setting.doc2') }}</span>
+                </el-link>
+                <el-divider direction="vertical" />
+                <el-link type="primary" :underline="false" @click="toGithub">
+                    <span class="font-normal">{{ $t('setting.project') }}</span>
+                </el-link>
+                <el-divider v-if="!mobile" direction="vertical" />
+            </div>
+            <div class="flex flex-wrap items-center">
+                <el-link :underline="false" class="-ml-2" type="primary" @click="toLxware">
+                    {{ $t(!isProductPro ? 'license.community' : 'license.pro') }}
+                </el-link>
+                <el-link :underline="false" class="version" type="primary" @click="copyText(version)">
+                    {{ version }}
+                </el-link>
+                <el-badge is-dot class="-mt-0.5" v-if="version !== 'Waiting' && globalStore.hasNewVersion">
+                    <el-link class="ml-2" :underline="false" type="primary" @click="onLoadUpgradeInfo">
+                        {{ $t('commons.operate.update') }}
+                    </el-link>
+                </el-badge>
+                <el-link
+                    v-if="version !== 'Waiting' && !globalStore.hasNewVersion"
+                    type="primary"
+                    :underline="false"
+                    class="ml-2"
+                    @click="onLoadUpgradeInfo"
+                >
+                    {{ $t('commons.operate.update') }}
+                </el-link>
+                <el-tag v-if="version === 'Waiting'" round style="margin-left: 10px">
+                    {{ $t('setting.upgrading') }}
+                </el-tag>
+            </div>
+        </div>
     </div>
-    <el-drawer :close-on-click-modal="false" :key="refresh" v-model="drawerVisible" size="50%" append-to-body>
+
+    <el-drawer
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+        :key="refresh"
+        v-model="drawerVisible"
+        size="50%"
+        append-to-body
+    >
         <template #header>
             <DrawerHeader :header="$t('commons.button.upgrade')" :back="handleClose" />
         </template>
         <div class="panel-MdEditor">
-            <el-alert :closable="false">
-                <span class="line-height">{{ $t('setting.versionHelper') }}</span>
-                <li class="line-height">{{ $t('setting.versionHelper1') }}</li>
-                <li class="line-height">{{ $t('setting.versionHelper2') }}</li>
-            </el-alert>
             <div class="default-theme" style="margin-left: 20px">
                 <h2 class="inline-block">{{ $t('app.version') }}</h2>
             </div>
             <el-radio-group class="inline-block tag" v-model="upgradeVersion" @change="changeOption">
                 <el-radio v-if="upgradeInfo.newVersion" :value="upgradeInfo.newVersion">
-                    {{ upgradeInfo.newVersion }} {{ $t('setting.newVersion') }}
+                    {{ upgradeInfo.newVersion }}
                 </el-radio>
-                <el-radio :value="upgradeInfo.latestVersion">
-                    {{ upgradeInfo.latestVersion }} {{ $t('setting.latestVersion') }}
+                <el-radio v-if="upgradeInfo.latestVersion" :value="upgradeInfo.latestVersion">
+                    {{ upgradeInfo.latestVersion }}
+                </el-radio>
+                <el-radio v-if="upgradeInfo.testVersion" :value="upgradeInfo.testVersion">
+                    {{ upgradeInfo.testVersion }}
                 </el-radio>
             </el-radio-group>
-            <MdEditor
-                v-model="upgradeInfo.releaseNote"
-                previewOnly
-                :theme="globalStore.$state.themeConfig.theme === 'dark' ? 'dark' : 'light'"
-            />
+            <MdEditor v-model="upgradeInfo.releaseNote" previewOnly :theme="isDarkTheme ? 'dark' : 'light'" />
         </div>
         <template #footer>
             <span class="dialog-footer">
@@ -75,10 +86,18 @@ import MdEditor from 'md-editor-v3';
 import i18n from '@/lang';
 import 'md-editor-v3/lib/style.css';
 import { MsgSuccess } from '@/utils/message';
-import { onMounted, ref } from 'vue';
+import { copyText } from '@/utils/util';
+import { onMounted, ref, computed } from 'vue';
 import { GlobalStore } from '@/store';
 import { ElMessageBox } from 'element-plus';
+import { storeToRefs } from 'pinia';
+
 const globalStore = GlobalStore();
+const { isDarkTheme, docsUrl } = storeToRefs(globalStore);
+
+const mobile = computed(() => {
+    return globalStore.isMobile();
+});
 
 const version = ref<string>('');
 const isProductPro = ref();
@@ -103,16 +122,23 @@ const handleClose = () => {
     drawerVisible.value = false;
 };
 
-const toHalo = () => {
-    window.open('https://www.lxware.cn/1panel' + '', '_blank', 'noopener,noreferrer');
+const toLxware = () => {
+    if (!globalStore.isIntl) {
+        window.open('https://www.lxware.cn/1panel' + '', '_blank', 'noopener,noreferrer');
+    } else {
+        window.open('https://1panel.pro/pricing' + '', '_blank', 'noopener,noreferrer');
+    }
 };
 
 const toDoc = () => {
-    window.open('https://1panel.cn/docs/', '_blank', 'noopener,noreferrer');
+    window.open(docsUrl.value, '_blank', 'noopener,noreferrer');
 };
 
 const toForum = () => {
-    window.open('https://bbs.fit2cloud.com/c/1p/7', '_blank');
+    let url = globalStore.isIntl
+        ? 'https://github.com/1Panel-dev/1Panel/discussions'
+        : 'https://bbs.fit2cloud.com/c/1p/7';
+    window.open(url, '_blank');
 };
 
 const toGithub = () => {
@@ -124,13 +150,25 @@ const onLoadUpgradeInfo = async () => {
     await loadUpgradeInfo()
         .then((res) => {
             loading.value = false;
-            if (!res.data) {
+            if (res.data.testVersion || res.data.newVersion || res.data.latestVersion) {
+                upgradeInfo.value = res.data;
+                drawerVisible.value = true;
+                if (upgradeInfo.value.newVersion) {
+                    upgradeVersion.value = upgradeInfo.value.newVersion;
+                    return;
+                }
+                if (upgradeInfo.value.latestVersion) {
+                    upgradeVersion.value = upgradeInfo.value.latestVersion;
+                    return;
+                }
+                if (upgradeInfo.value.testVersion) {
+                    upgradeVersion.value = upgradeInfo.value.testVersion;
+                    return;
+                }
+            } else {
                 MsgSuccess(i18n.global.t('setting.noUpgrade'));
                 return;
             }
-            upgradeInfo.value = res.data;
-            upgradeVersion.value = upgradeInfo.value.newVersion || upgradeInfo.value.latestVersion;
-            drawerVisible.value = true;
         })
         .catch(() => {
             loading.value = false;
@@ -165,10 +203,13 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .version {
+    margin-left: 8px;
     font-size: 14px;
-    color: #858585;
+    color: var(--panel-color-primary-light-4);
     text-decoration: none;
     letter-spacing: 0.5px;
+    cursor: pointer;
+    font-family: auto;
 }
 .line-height {
     line-height: 25px;
@@ -184,9 +225,16 @@ onMounted(() => {
         font-size: 14px;
     }
     :deep(.default-theme h2) {
-        margin: 13px, 0;
+        color: var(--el-color-primary);
+        margin: 13px 0;
         padding: 0;
         font-size: 16px;
     }
+}
+:deep(.el-link__inner) {
+    font-weight: 400;
+}
+:deep(.md-editor-dark) {
+    background-color: var(--panel-main-bg-color-9);
 }
 </style>

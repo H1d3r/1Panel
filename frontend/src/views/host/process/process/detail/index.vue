@@ -1,5 +1,5 @@
 <template>
-    <el-drawer v-model="open" size="40%">
+    <el-drawer v-model="open" size="40%" :close-on-click-modal="false" :close-on-press-escape="false">
         <template #header>
             <DrawerHeader :header="$t('app.detail')" :back="handleClose" :resource="resourceName" />
         </template>
@@ -83,7 +83,7 @@
                                     <span v-if="row.remoteaddr.port > 0">:{{ row.remoteaddr.port }}</span>
                                 </template>
                             </el-table-column>
-                            <el-table-column prop="status" :label="$t('app.status')" />
+                            <el-table-column prop="status" :label="$t('process.state')" />
                         </el-table>
                     </el-tab-pane>
                 </el-tabs>

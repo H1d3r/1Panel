@@ -1,6 +1,12 @@
 <template>
     <div>
-        <el-drawer v-model="drawerVisible" :destroy-on-close="true" :close-on-click-modal="false" size="50%">
+        <el-drawer
+            v-model="drawerVisible"
+            :destroy-on-close="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            size="50%"
+        >
             <template #header>
                 <DrawerHeader :header="title + $t('setting.backupAccount')" :back="handleClose" />
             </template>
@@ -10,10 +16,10 @@
                         <el-form-item :label="$t('commons.table.type')" prop="type" :rules="Rules.requiredSelect">
                             <el-tag>{{ $t('setting.' + kodoData.rowData!.type) }}</el-tag>
                         </el-form-item>
-                        <el-form-item label="Access Key ID" prop="accessKey" :rules="Rules.requiredInput">
+                        <el-form-item label="Access key ID" prop="accessKey" :rules="Rules.requiredInput">
                             <el-input v-model.trim="kodoData.rowData!.accessKey" />
                         </el-form-item>
-                        <el-form-item label="Secret Key" prop="credential" :rules="Rules.requiredInput">
+                        <el-form-item label="Secret key" prop="credential" :rules="Rules.requiredInput">
                             <el-input show-password clearable v-model.trim="kodoData.rowData!.credential" />
                         </el-form-item>
                         <el-form-item
@@ -23,26 +29,40 @@
                         >
                             <el-input v-model="kodoData.rowData!.varsJson['domainItem']">
                                 <template #prepend>
-                                    <el-select v-model.trim="domainProto" style="width: 100px">
+                                    <el-select v-model.trim="domainProto" style="width: 120px">
                                         <el-option label="http" value="http" />
                                         <el-option label="https" value="https" />
                                     </el-select>
                                 </template>
                             </el-input>
                         </el-form-item>
-                        <el-form-item label="Bucket" prop="bucket">
-                            <el-select
-                                @change="errBuckets = false"
-                                style="width: 80%"
+                        <el-form-item label="Bucket" prop="bucket" :rules="Rules.requiredInput">
+                            <el-checkbox v-model="kodoData.rowData!.bucketInput" :label="$t('container.input')" />
+                            <el-input
+                                clearable
+                                v-if="kodoData.rowData!.bucketInput"
                                 v-model="kodoData.rowData!.bucket"
-                            >
-                                <el-option v-for="item in buckets" :key="item" :value="item" />
-                            </el-select>
-                            <el-button style="width: 20%" plain @click="getBuckets(formRef)">
-                                {{ $t('setting.loadBucket') }}
-                            </el-button>
-                            <span v-if="errBuckets" class="input-error">{{ $t('commons.rule.requiredSelect') }}</span>
+                            />
+                            <div v-else class="w-full">
+                                <el-select style="width: 80%" v-model="kodoData.rowData!.bucket">
+                                    <el-option v-for="item in buckets" :key="item" :value="item" />
+                                </el-select>
+                                <el-button style="width: 20%" plain @click="getBuckets()">
+                                    {{ $t('setting.loadBucket') }}
+                                </el-button>
+                            </div>
                         </el-form-item>
+
+                        <el-form-item :label="$t('cronjob.requestExpirationTime')" prop="varsJson.timeout">
+                            <el-input-number
+                                style="width: 200px"
+                                :min="1"
+                                step-strictly
+                                :step="1"
+                                v-model.number="kodoData.rowData!.varsJson['timeout']"
+                            ></el-input-number>
+                        </el-form-item>
+
                         <el-form-item :label="$t('setting.backupDir')" prop="backupPath">
                             <el-input clearable v-model.trim="kodoData.rowData!.backupPath" placeholder="/1panel" />
                         </el-form-item>
@@ -78,7 +98,6 @@ const loading = ref(false);
 type FormInstance = InstanceType<typeof ElForm>;
 const formRef = ref<FormInstance>();
 const buckets = ref();
-const errBuckets = ref();
 
 const domainProto = ref('http');
 const emit = defineEmits(['search']);
@@ -101,6 +120,9 @@ const acceptParams = (params: DialogProps): void => {
         domainProto.value = httpItem.proto;
     }
     title.value = i18n.global.t('commons.button.' + kodoData.value.title);
+    if (kodoData.value.rowData!.varsJson['timeout'] === undefined) {
+        kodoData.value.rowData!.varsJson['timeout'] = 1;
+    }
     drawerVisible.value = true;
 };
 
@@ -109,35 +131,27 @@ const handleClose = () => {
     drawerVisible.value = false;
 };
 
-const getBuckets = async (formEl: FormInstance | undefined) => {
-    if (!formEl) return;
-    formEl.validate(async (valid) => {
-        if (!valid) return;
-        loading.value = true;
-        let item = deepCopy(kodoData.value.rowData!.varsJson);
-        item['domain'] = spliceHttp(domainProto.value, kodoData.value.rowData!.varsJson['domainItem']);
-        listBucket({
-            type: kodoData.value.rowData!.type,
-            vars: JSON.stringify(item),
-            accessKey: kodoData.value.rowData!.accessKey,
-            credential: kodoData.value.rowData!.credential,
+const getBuckets = async () => {
+    loading.value = true;
+    let item = deepCopy(kodoData.value.rowData!.varsJson);
+    item['domain'] = spliceHttp(domainProto.value, kodoData.value.rowData!.varsJson['domainItem']);
+    listBucket({
+        type: kodoData.value.rowData!.type,
+        vars: JSON.stringify(item),
+        accessKey: kodoData.value.rowData!.accessKey,
+        credential: kodoData.value.rowData!.credential,
+    })
+        .then((res) => {
+            loading.value = false;
+            buckets.value = res.data;
         })
-            .then((res) => {
-                loading.value = false;
-                buckets.value = res.data;
-            })
-            .catch(() => {
-                buckets.value = [];
-                loading.value = false;
-            });
-    });
+        .catch(() => {
+            buckets.value = [];
+            loading.value = false;
+        });
 };
 
 const onSubmit = async (formEl: FormInstance | undefined) => {
-    if (!kodoData.value.rowData.bucket) {
-        errBuckets.value = true;
-        return;
-    }
     if (!formEl) return;
     formEl.validate(async (valid) => {
         if (!valid) return;

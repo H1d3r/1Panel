@@ -5,23 +5,39 @@
             <template #prompt>
                 <el-alert type="info" :closable="false">
                     <template #title>
-                        <span v-html="$t('runtime.statusHelper')"></span>
+                        <span class="input-help whitespace-break-spaces">
+                            {{ $t('runtime.statusHelper') }}
+                        </span>
                     </template>
                 </el-alert>
             </template>
             <template #toolbar>
-                <el-button type="primary" @click="openCreate">
-                    {{ $t('runtime.create') }}
-                </el-button>
+                <div class="flex flex-wrap gap-3">
+                    <el-button type="primary" @click="openCreate">
+                        {{ $t('runtime.create') }}
+                    </el-button>
+
+                    <el-button type="primary" plain @click="onOpenBuildCache()">
+                        {{ $t('container.cleanBuildCache') }}
+                    </el-button>
+                </div>
             </template>
             <template #main>
                 <ComplexTable :pagination-config="paginationConfig" :data="items" @search="search()">
-                    <el-table-column :label="$t('commons.table.name')" fix prop="name" min-width="120px">
+                    <el-table-column
+                        :label="$t('commons.table.name')"
+                        fix
+                        prop="name"
+                        min-width="120px"
+                        show-overflow-tooltip
+                    >
                         <template #default="{ row }">
-                            <Tooltip :text="row.name" @click="openDetail(row)" />
+                            <el-text type="primary" class="cursor-pointer" @click="openDetail(row)">
+                                {{ row.name }}
+                            </el-text>
                         </template>
                     </el-table-column>
-                    <el-table-column :label="$t('runtime.codeDir')" prop="codeDir">
+                    <el-table-column :label="$t('runtime.codeDir')" prop="codeDir" min-width="120px">
                         <template #default="{ row }">
                             <el-button type="primary" link @click="toFolder(row.codeDir)">
                                 <el-icon>
@@ -31,7 +47,7 @@
                         </template>
                     </el-table-column>
                     <el-table-column :label="$t('runtime.version')" prop="version"></el-table-column>
-                    <el-table-column :label="$t('runtime.externalPort')" prop="port">
+                    <el-table-column :label="$t('runtime.externalPort')" prop="port" min-width="110px">
                         <template #default="{ row }">
                             {{ row.port }}
                             <el-button link :icon="Promotion" @click="goDashboard(row.port, 'http')"></el-button>
@@ -55,7 +71,7 @@
                             </div>
                         </template>
                     </el-table-column>
-                    <el-table-column :label="$t('commons.button.log')" prop="path">
+                    <el-table-column :label="$t('commons.button.log')" prop="path" min-width="90px">
                         <template #default="{ row }">
                             <el-button @click="openLog(row)" link type="primary">{{ $t('website.check') }}</el-button>
                         </template>
@@ -69,8 +85,8 @@
                         fix
                     />
                     <fu-table-operations
-                        :ellipsis="10"
-                        width="300px"
+                        :ellipsis="mobile ? 0 : 10"
+                        :min-width="mobile ? 'auto' : 300"
                         :buttons="buttons"
                         :label="$t('commons.table.operate')"
                         fixed="right"
@@ -84,13 +100,14 @@
         <ComposeLogs ref="composeLogRef" />
         <PortJumpDialog ref="dialogPortJumpRef" />
         <Modules ref="moduleRef" />
+        <AppResources ref="checkRef" @close="search" />
     </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref } from 'vue';
+import { onMounted, onUnmounted, reactive, ref, computed } from 'vue';
 import { Runtime } from '@/api/interface/runtime';
-import { OperateRuntime, SearchRuntimes, SyncRuntime } from '@/api/modules/runtime';
+import { OperateRuntime, RuntimeDeleteCheck, SearchRuntimes, SyncRuntime } from '@/api/modules/runtime';
 import { dateFormat } from '@/utils/util';
 import OperateNode from '@/views/website/runtime/node/operate/index.vue';
 import Status from '@/components/status/index.vue';
@@ -102,6 +119,11 @@ import router from '@/routers/router';
 import ComposeLogs from '@/components/compose-log/index.vue';
 import { Promotion } from '@element-plus/icons-vue';
 import PortJumpDialog from '@/components/port-jump/index.vue';
+import AppResources from '@/views/website/runtime/php/check/index.vue';
+import { ElMessageBox } from 'element-plus';
+import { containerPrune } from '@/api/modules/container';
+import { MsgSuccess } from '@/utils/message';
+import { GlobalStore } from '@/store';
 
 let timer: NodeJS.Timer | null = null;
 const loading = ref(false);
@@ -111,6 +133,12 @@ const deleteRef = ref();
 const dialogPortJumpRef = ref();
 const composeLogRef = ref();
 const moduleRef = ref();
+const checkRef = ref();
+
+const globalStore = GlobalStore();
+const mobile = computed(() => {
+    return globalStore.isMobile();
+});
 
 const paginationConfig = reactive({
     cacheSizeKey: 'runtime-page-size',
@@ -209,7 +237,37 @@ const openDetail = (row: Runtime.Runtime) => {
 };
 
 const openDelete = async (row: Runtime.Runtime) => {
-    deleteRef.value.acceptParams(row.id, row.name);
+    RuntimeDeleteCheck(row.id).then(async (res) => {
+        const items = res.data;
+        if (res.data && res.data.length > 0) {
+            checkRef.value.acceptParams({ items: items, key: 'website', installID: row.id });
+        } else {
+            deleteRef.value.acceptParams(row.id, row.name);
+        }
+    });
+};
+
+const onOpenBuildCache = () => {
+    ElMessageBox.confirm(i18n.global.t('container.delBuildCacheHelper'), i18n.global.t('container.cleanBuildCache'), {
+        confirmButtonText: i18n.global.t('commons.button.confirm'),
+        cancelButtonText: i18n.global.t('commons.button.cancel'),
+        type: 'info',
+    }).then(async () => {
+        loading.value = true;
+        let params = {
+            pruneType: 'buildcache',
+            withTagAll: false,
+        };
+        await containerPrune(params)
+            .then((res) => {
+                loading.value = false;
+                MsgSuccess(i18n.global.t('container.cleanSuccess', [res.data.deletedNumber]));
+                search();
+            })
+            .catch(() => {
+                loading.value = false;
+            });
+    });
 };
 
 const openLog = (row: any) => {
