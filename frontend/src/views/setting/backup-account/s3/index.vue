@@ -1,8 +1,14 @@
 <template>
     <div>
-        <el-drawer v-model="drawerVisible" :destroy-on-close="true" :close-on-click-modal="false" size="50%">
+        <el-drawer
+            v-model="drawerVisible"
+            :destroy-on-close="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            size="50%"
+        >
             <template #header>
-                <DrawerHeader :header="title + $t('setting.backupAccount')" :back="handleClose" />
+                <DrawerHeader :header="title + $t('setting.backupAccount').toLowerCase()" :back="handleClose" />
             </template>
             <el-form @submit.prevent ref="formRef" v-loading="loading" label-position="top" :model="s3Data.rowData">
                 <el-row type="flex" justify="center">
@@ -10,7 +16,13 @@
                         <el-form-item :label="$t('commons.table.type')" prop="type" :rules="Rules.requiredSelect">
                             <el-tag>{{ $t('setting.' + s3Data.rowData!.type) }}</el-tag>
                         </el-form-item>
-                        <el-form-item label="Access Key ID" prop="accessKey" :rules="Rules.requiredInput">
+                        <el-form-item :label="$t('setting.mode')" prop="varsJson.mode" :rules="Rules.requiredSelect">
+                            <el-radio-group v-model="s3Data.rowData!.varsJson['mode']">
+                                <el-radio value="virtual hosted">Virtual Hosted</el-radio>
+                                <el-radio value="path">Path</el-radio>
+                            </el-radio-group>
+                        </el-form-item>
+                        <el-form-item label="Access key ID" prop="accessKey" :rules="Rules.requiredInput">
                             <el-input v-model.trim="s3Data.rowData!.accessKey" />
                         </el-form-item>
                         <el-form-item label="Secret Key" prop="credential" :rules="Rules.requiredInput">
@@ -22,21 +34,24 @@
                         <el-form-item label="Endpoint" prop="varsJson.endpointItem" :rules="Rules.requiredInput">
                             <el-input v-model="s3Data.rowData!.varsJson['endpointItem']">
                                 <template #prepend>
-                                    <el-select v-model.trim="endpointProto" style="width: 100px">
+                                    <el-select v-model="endpointProto" style="width: 120px">
                                         <el-option label="http" value="http" />
                                         <el-option label="https" value="https" />
                                     </el-select>
                                 </template>
                             </el-input>
                         </el-form-item>
-                        <el-form-item label="Bucket" prop="bucket">
-                            <el-select @change="errBuckets = false" style="width: 80%" v-model="s3Data.rowData!.bucket">
-                                <el-option v-for="item in buckets" :key="item" :value="item" />
-                            </el-select>
-                            <el-button style="width: 20%" plain @click="getBuckets(formRef)">
-                                {{ $t('setting.loadBucket') }}
-                            </el-button>
-                            <span v-if="errBuckets" class="input-error">{{ $t('commons.rule.requiredSelect') }}</span>
+                        <el-form-item label="Bucket" prop="bucket" :rules="Rules.requiredInput">
+                            <el-checkbox v-model="s3Data.rowData!.bucketInput" :label="$t('container.input')" />
+                            <el-input clearable v-if="s3Data.rowData!.bucketInput" v-model="s3Data.rowData!.bucket" />
+                            <div v-else class="w-full">
+                                <el-select style="width: 80%" v-model="s3Data.rowData!.bucket">
+                                    <el-option v-for="item in buckets" :key="item" :value="item" />
+                                </el-select>
+                                <el-button style="width: 20%" plain @click="getBuckets()">
+                                    {{ $t('setting.loadBucket') }}
+                                </el-button>
+                            </div>
                         </el-form-item>
                         <el-form-item
                             :label="$t('setting.scType')"
@@ -92,7 +107,6 @@ const loading = ref(false);
 type FormInstance = InstanceType<typeof ElForm>;
 const formRef = ref<FormInstance>();
 const buckets = ref();
-const errBuckets = ref();
 
 const endpointProto = ref('http');
 const emit = defineEmits(['search']);
@@ -109,8 +123,11 @@ const s3Data = ref<DialogProps>({
 const acceptParams = (params: DialogProps): void => {
     buckets.value = [];
     s3Data.value = params;
-    if (params.title === 'create' || (params.title === 'edit' && !s3Data.value.rowData.varsJson['scType'])) {
+    if (!s3Data.value.rowData.varsJson['scType']) {
         s3Data.value.rowData.varsJson['scType'] = 'STANDARD';
+    }
+    if (!s3Data.value.rowData.varsJson['mode']) {
+        s3Data.value.rowData.varsJson['mode'] = 'virtual hosted';
     }
     if (s3Data.value.title === 'edit') {
         let httpItem = splitHttp(s3Data.value.rowData!.varsJson['endpoint']);
@@ -126,35 +143,27 @@ const handleClose = () => {
     drawerVisible.value = false;
 };
 
-const getBuckets = async (formEl: FormInstance | undefined) => {
-    if (!formEl) return;
-    formEl.validate(async (valid) => {
-        if (!valid) return;
-        loading.value = true;
-        let item = deepCopy(s3Data.value.rowData!.varsJson);
-        item['endpoint'] = spliceHttp(endpointProto.value, s3Data.value.rowData!.varsJson['endpointItem']);
-        listBucket({
-            type: s3Data.value.rowData!.type,
-            vars: JSON.stringify(item),
-            accessKey: s3Data.value.rowData!.accessKey,
-            credential: s3Data.value.rowData!.credential,
+const getBuckets = async () => {
+    loading.value = true;
+    let item = deepCopy(s3Data.value.rowData!.varsJson);
+    item['endpoint'] = spliceHttp(endpointProto.value, s3Data.value.rowData!.varsJson['endpointItem']);
+    listBucket({
+        type: s3Data.value.rowData!.type,
+        vars: JSON.stringify(item),
+        accessKey: s3Data.value.rowData!.accessKey,
+        credential: s3Data.value.rowData!.credential,
+    })
+        .then((res) => {
+            loading.value = false;
+            buckets.value = res.data;
         })
-            .then((res) => {
-                loading.value = false;
-                buckets.value = res.data;
-            })
-            .catch(() => {
-                buckets.value = [];
-                loading.value = false;
-            });
-    });
+        .catch(() => {
+            buckets.value = [];
+            loading.value = false;
+        });
 };
 
 const onSubmit = async (formEl: FormInstance | undefined) => {
-    if (!s3Data.value.rowData.bucket) {
-        errBuckets.value = true;
-        return;
-    }
     if (!formEl) return;
     formEl.validate(async (valid) => {
         if (!valid) return;

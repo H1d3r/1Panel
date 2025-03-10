@@ -9,12 +9,10 @@
             ]"
         >
             <template #route-button>
-                <div class="router-button">
-                    <template v-if="!isProductPro">
-                        <el-button link type="primary" @click="toUpload">
-                            {{ $t('license.levelUpPro') }}
-                        </el-button>
-                    </template>
+                <div class="router-button" v-if="!isProductPro">
+                    <el-button link type="primary" @click="toUpload">
+                        {{ $t('license.levelUpPro') }}
+                    </el-button>
                 </div>
             </template>
         </RouterButton>
@@ -42,24 +40,24 @@
 
         <el-row :gutter="20" style="margin-top: 20px">
             <el-col :xs="24" :sm="24" :md="16" :lg="16" :xl="16">
-                <CardWithHeader :header="$t('home.overview')" height="146px">
+                <CardWithHeader :header="$t('home.overview')" height="166px">
                     <template #body>
                         <div class="h-overview">
                             <el-row>
                                 <el-col :span="6">
-                                    <span>{{ $t('menu.website') }}</span>
+                                    <span>{{ $t('menu.website', 2) }}</span>
                                     <div class="count">
                                         <span @click="goRouter('/websites')">{{ baseInfo?.websiteNumber }}</span>
                                     </div>
                                 </el-col>
                                 <el-col :span="6">
-                                    <span>{{ $t('menu.database') }}</span>
+                                    <span>{{ $t('menu.database', 2) }} - {{ $t('database.all') }}</span>
                                     <div class="count">
                                         <span @click="goRouter('/databases')">{{ baseInfo?.databaseNumber }}</span>
                                     </div>
                                 </el-col>
                                 <el-col :span="6">
-                                    <span>{{ $t('menu.cronjob') }}</span>
+                                    <span>{{ $t('menu.cronjob', 2) }}</span>
                                     <div class="count">
                                         <span @click="goRouter('/cronjobs')">
                                             {{ baseInfo?.cronjobNumber }}
@@ -80,7 +78,7 @@
                 </CardWithHeader>
                 <CardWithHeader :header="$t('commons.table.status')" style="margin-top: 20px">
                     <template #body>
-                        <Status ref="statusRef" style="margin-top: -7px" />
+                        <Status ref="statusRef" style="margin-bottom: 33px" />
                     </template>
                 </CardWithHeader>
                 <CardWithHeader :header="$t('menu.monitor')" style="margin-top: 20px; margin-bottom: 20px">
@@ -123,10 +121,14 @@
                         </el-select>
                     </template>
                     <template #body>
-                        <div style="position: relative; margin-top: 20px">
+                        <div style="position: relative; margin-top: 60px">
                             <div class="monitor-tags" v-if="chartOption === 'network'">
-                                <el-tag>{{ $t('monitor.up') }}: {{ currentChartInfo.netBytesSent }} KB/s</el-tag>
-                                <el-tag>{{ $t('monitor.down') }}: {{ currentChartInfo.netBytesRecv }} KB/s</el-tag>
+                                <el-tag>
+                                    {{ $t('monitor.up') }}: {{ computeSizeFromKBs(currentChartInfo.netBytesSent) }}
+                                </el-tag>
+                                <el-tag>
+                                    {{ $t('monitor.down') }}: {{ computeSizeFromKBs(currentChartInfo.netBytesRecv) }}
+                                </el-tag>
                                 <el-tag>{{ $t('home.totalSend') }}: {{ computeSize(currentInfo.netBytesSent) }}</el-tag>
                                 <el-tag>{{ $t('home.totalRecv') }}: {{ computeSize(currentInfo.netBytesRecv) }}</el-tag>
                             </div>
@@ -167,21 +169,24 @@
             <el-col :xs="24" :sm="24" :md="8" :lg="8" :xl="8">
                 <CardWithHeader :header="$t('home.systemInfo')">
                     <template #body>
-                        <el-scrollbar>
-                            <el-descriptions :column="1" class="h-systemInfo">
-                                <el-descriptions-item class-name="system-content">
+                        <div class="h-systemInfo">
+                            <el-descriptions :column="1" border>
+                                <el-descriptions-item class-name="system-content" label-class-name="system-label">
                                     <template #label>
-                                        <span class="system-label">
-                                            {{ $t('home.hostname') }}
-                                        </span>
+                                        <span>{{ $t('home.hostname') }}</span>
                                     </template>
-                                    {{ baseInfo.hostname }}
+                                    <el-tooltip
+                                        v-if="baseInfo.hostname.length > 30"
+                                        :content="baseInfo.hostname"
+                                        placement="bottom"
+                                    >
+                                        {{ baseInfo.hostname.substring(0, 27) + '...' }}
+                                    </el-tooltip>
+                                    <span v-else>{{ baseInfo.hostname }}</span>
                                 </el-descriptions-item>
-                                <el-descriptions-item class-name="system-content">
+                                <el-descriptions-item class-name="system-content" label-class-name="system-label">
                                     <template #label>
-                                        <span class="system-label">
-                                            {{ $t('home.platformVersion') }}
-                                        </span>
+                                        <span>{{ $t('home.platformVersion') }}</span>
                                     </template>
                                     {{
                                         baseInfo.platformVersion
@@ -189,40 +194,59 @@
                                             : baseInfo.platform + '-' + baseInfo.platformVersion
                                     }}
                                 </el-descriptions-item>
-                                <el-descriptions-item class-name="system-content">
+                                <el-descriptions-item class-name="system-content" label-class-name="system-label">
                                     <template #label>
-                                        <span class="system-label">
-                                            {{ $t('home.kernelVersion') }}
-                                        </span>
+                                        <span>{{ $t('home.kernelVersion') }}</span>
                                     </template>
-                                    {{ baseInfo.kernelVersion }}
+                                    <el-tooltip
+                                        v-if="baseInfo.kernelVersion.length > 30"
+                                        :content="baseInfo.kernelVersion"
+                                        placement="bottom"
+                                    >
+                                        {{ baseInfo.kernelVersion.substring(0, 27) + '...' }}
+                                    </el-tooltip>
+                                    <span v-else>{{ baseInfo.kernelVersion }}</span>
                                 </el-descriptions-item>
-                                <el-descriptions-item class-name="system-content">
+                                <el-descriptions-item class-name="system-content" label-class-name="system-label">
                                     <template #label>
-                                        <span class="system-label">
-                                            {{ $t('home.kernelArch') }}
-                                        </span>
+                                        <span>{{ $t('home.kernelArch') }}</span>
                                     </template>
                                     {{ baseInfo.kernelArch }}
                                 </el-descriptions-item>
-                                <el-descriptions-item class-name="system-content">
+                                <el-descriptions-item
+                                    v-if="baseInfo.ipv4Addr && baseInfo.ipv4Addr !== 'IPNotFound'"
+                                    class-name="system-content"
+                                    label-class-name="system-label"
+                                >
                                     <template #label>
-                                        <span class="system-label">
-                                            {{ $t('home.uptime') }}
-                                        </span>
+                                        <span>{{ $t('home.ip') }}</span>
+                                    </template>
+                                    {{ baseInfo.ipv4Addr }}
+                                </el-descriptions-item>
+                                <el-descriptions-item
+                                    v-if="baseInfo.systemProxy && baseInfo.systemProxy !== 'noProxy'"
+                                    class-name="system-content"
+                                    label-class-name="system-label"
+                                >
+                                    <template #label>
+                                        <span>{{ $t('home.proxy') }}</span>
+                                    </template>
+                                    {{ baseInfo.systemProxy }}
+                                </el-descriptions-item>
+                                <el-descriptions-item class-name="system-content" label-class-name="system-label">
+                                    <template #label>
+                                        <span>{{ $t('home.uptime') }}</span>
                                     </template>
                                     {{ currentInfo.timeSinceUptime }}
                                 </el-descriptions-item>
-                                <el-descriptions-item class-name="system-content">
+                                <el-descriptions-item class-name="system-content" label-class-name="system-label">
                                     <template #label>
-                                        <span class="system-label">
-                                            {{ $t('home.runningTime') }}
-                                        </span>
+                                        <span>{{ $t('home.runningTime') }}</span>
                                     </template>
                                     {{ loadUpTime(currentInfo.uptime) }}
                                 </el-descriptions-item>
                             </el-descriptions>
-                        </el-scrollbar>
+                        </div>
                     </template>
                 </CardWithHeader>
 
@@ -247,7 +271,7 @@ import LicenseImport from '@/components/license-import/index.vue';
 import CardWithHeader from '@/components/card-with-header/index.vue';
 import i18n from '@/lang';
 import { Dashboard } from '@/api/interface/dashboard';
-import { dateFormatForSecond, computeSize } from '@/utils/util';
+import { dateFormatForSecond, computeSize, computeSizeFromKBs } from '@/utils/util';
 import { useRouter } from 'vue-router';
 import { loadBaseInfo, loadCurrentInfo } from '@/api/modules/dashboard';
 import { getIOOptions, getNetworkOptions } from '@/api/modules/host';
@@ -264,7 +288,6 @@ const isSafety = ref();
 const chartOption = ref('network');
 let timer: NodeJS.Timer | null = null;
 let isInit = ref<boolean>(true);
-let isStatusInit = ref<boolean>(true);
 let isActive = ref(true);
 
 const ioReadBytes = ref<Array<number>>([]);
@@ -283,6 +306,7 @@ const isProductPro = ref();
 const searchInfo = reactive({
     ioOption: 'all',
     netOption: 'all',
+    scope: 'all',
 });
 
 const baseInfo = ref<Dashboard.BaseInfo>({
@@ -299,7 +323,8 @@ const baseInfo = ref<Dashboard.BaseInfo>({
     kernelArch: '',
     kernelVersion: '',
     virtualizationSystem: '',
-
+    ipv4Addr: '',
+    systemProxy: '',
     cpuCores: 0,
     cpuLogicalCores: 0,
     cpuModelName: '',
@@ -337,6 +362,7 @@ const currentInfo = ref<Dashboard.CurrentInfo>({
 
     diskData: [],
     gpuData: [],
+    xpuData: [],
 
     netBytesSent: 0,
     netBytesRecv: 0,
@@ -388,77 +414,145 @@ const onLoadBaseInfo = async (isInit: boolean, range: string) => {
     }
     const res = await loadBaseInfo(searchInfo.ioOption, searchInfo.netOption);
     baseInfo.value = res.data;
-    currentInfo.value = baseInfo.value.currentInfo;
-    await onLoadCurrentInfo();
-    isStatusInit.value = false;
-    statusRef.value.acceptParams(currentInfo.value, baseInfo.value, isStatusInit.value);
+
+    const resData = res.data.currentInfo;
+    currentInfo.value.ioReadBytes = resData.ioReadBytes;
+    currentInfo.value.ioWriteBytes = resData.ioWriteBytes;
+    currentInfo.value.ioCount = resData.ioCount;
+    currentInfo.value.ioReadTime = resData.ioReadTime;
+    currentInfo.value.ioWriteTime = resData.ioWriteTime;
+    currentInfo.value.netBytesSent = resData.netBytesSent;
+    currentInfo.value.netBytesRecv = resData.netBytesRecv;
+    currentInfo.value.uptime = resData.uptime;
+
+    loadAppCurrentInfo();
+    statusRef.value.acceptParams(currentInfo.value, baseInfo.value);
     appRef.value.acceptParams();
     if (isInit) {
         timer = setInterval(async () => {
             if (isActive.value && !globalStore.isOnRestart) {
-                await onLoadCurrentInfo();
+                loadAppCurrentInfo();
             }
         }, 3000);
     }
 };
 
-const onLoadCurrentInfo = async () => {
-    const res = await loadCurrentInfo(searchInfo.ioOption, searchInfo.netOption);
-    currentInfo.value.timeSinceUptime = res.data.timeSinceUptime;
+const loadAppCurrentInfo = async () => {
+    await Promise.all([onLoadCurrentInfo('gpu'), onLoadCurrentInfo('basic'), onLoadCurrentInfo('ioNet')]);
+    statusRef.value.acceptParams(currentInfo.value, baseInfo.value);
+};
 
-    let timeInterval = Number(res.data.uptime - currentInfo.value.uptime) || 3;
-    currentChartInfo.netBytesSent =
-        res.data.netBytesSent - currentInfo.value.netBytesSent > 0
-            ? Number(((res.data.netBytesSent - currentInfo.value.netBytesSent) / 1024 / timeInterval).toFixed(2))
-            : 0;
-    netBytesSents.value.push(currentChartInfo.netBytesSent);
-    if (netBytesSents.value.length > 20) {
-        netBytesSents.value.splice(0, 1);
-    }
+const onLoadCurrentInfo = async (scope: string) => {
+    const req = {
+        scope: scope,
+        ioOption: searchInfo.ioOption,
+        netOption: searchInfo.netOption,
+    };
+    const res = await loadCurrentInfo(req);
+    const resData = res.data;
 
-    currentChartInfo.netBytesRecv =
-        res.data.netBytesRecv - currentInfo.value.netBytesRecv > 0
-            ? Number(((res.data.netBytesRecv - currentInfo.value.netBytesRecv) / 1024 / timeInterval).toFixed(2))
-            : 0;
-    netBytesRecvs.value.push(currentChartInfo.netBytesRecv);
-    if (netBytesRecvs.value.length > 20) {
-        netBytesRecvs.value.splice(0, 1);
-    }
+    if (scope === 'ioNet') {
+        let timeInterval = Number(res.data.uptime - currentInfo.value.uptime) || 3;
+        currentChartInfo.netBytesSent =
+            res.data.netBytesSent - currentInfo.value.netBytesSent > 0
+                ? Number(((res.data.netBytesSent - currentInfo.value.netBytesSent) / 1024 / timeInterval).toFixed(2))
+                : 0;
+        netBytesSents.value.push(currentChartInfo.netBytesSent);
 
-    currentChartInfo.ioReadBytes =
-        res.data.ioReadBytes - currentInfo.value.ioReadBytes > 0
-            ? Number(((res.data.ioReadBytes - currentInfo.value.ioReadBytes) / 1024 / 1024 / timeInterval).toFixed(2))
-            : 0;
-    ioReadBytes.value.push(currentChartInfo.ioReadBytes);
-    if (ioReadBytes.value.length > 20) {
-        ioReadBytes.value.splice(0, 1);
-    }
+        if (netBytesSents.value.length > 20) {
+            netBytesSents.value.splice(0, 1);
+        }
 
-    currentChartInfo.ioWriteBytes =
-        res.data.ioWriteBytes - currentInfo.value.ioWriteBytes > 0
-            ? Number(((res.data.ioWriteBytes - currentInfo.value.ioWriteBytes) / 1024 / 1024 / timeInterval).toFixed(2))
-            : 0;
-    ioWriteBytes.value.push(currentChartInfo.ioWriteBytes);
-    if (ioWriteBytes.value.length > 20) {
-        ioWriteBytes.value.splice(0, 1);
-    }
-    currentChartInfo.ioCount = Math.round(Number((res.data.ioCount - currentInfo.value.ioCount) / timeInterval));
-    let ioReadTime = res.data.ioReadTime - currentInfo.value.ioReadTime;
-    let ioWriteTime = res.data.ioWriteTime - currentInfo.value.ioWriteTime;
-    let ioChoose = ioReadTime > ioWriteTime ? ioReadTime : ioWriteTime;
-    currentChartInfo.ioTime = Math.round(Number(ioChoose / timeInterval));
+        currentChartInfo.netBytesRecv =
+            res.data.netBytesRecv - currentInfo.value.netBytesRecv > 0
+                ? Number(((res.data.netBytesRecv - currentInfo.value.netBytesRecv) / 1024 / timeInterval).toFixed(2))
+                : 0;
+        netBytesRecvs.value.push(currentChartInfo.netBytesRecv);
+        if (netBytesRecvs.value.length > 20) {
+            netBytesRecvs.value.splice(0, 1);
+        }
 
-    timeIODatas.value.push(dateFormatForSecond(res.data.shotTime));
-    if (timeIODatas.value.length > 20) {
-        timeIODatas.value.splice(0, 1);
+        currentChartInfo.ioReadBytes =
+            res.data.ioReadBytes - currentInfo.value.ioReadBytes > 0
+                ? Number(
+                      ((res.data.ioReadBytes - currentInfo.value.ioReadBytes) / 1024 / 1024 / timeInterval).toFixed(2),
+                  )
+                : 0;
+        ioReadBytes.value.push(currentChartInfo.ioReadBytes);
+        if (ioReadBytes.value.length > 20) {
+            ioReadBytes.value.splice(0, 1);
+        }
+
+        currentChartInfo.ioWriteBytes =
+            res.data.ioWriteBytes - currentInfo.value.ioWriteBytes > 0
+                ? Number(
+                      ((res.data.ioWriteBytes - currentInfo.value.ioWriteBytes) / 1024 / 1024 / timeInterval).toFixed(
+                          2,
+                      ),
+                  )
+                : 0;
+        ioWriteBytes.value.push(currentChartInfo.ioWriteBytes);
+        if (ioWriteBytes.value.length > 20) {
+            ioWriteBytes.value.splice(0, 1);
+        }
+        currentChartInfo.ioCount = Math.round(Number((res.data.ioCount - currentInfo.value.ioCount) / timeInterval));
+        let ioReadTime = res.data.ioReadTime - currentInfo.value.ioReadTime;
+        let ioWriteTime = res.data.ioWriteTime - currentInfo.value.ioWriteTime;
+        let ioChoose = ioReadTime > ioWriteTime ? ioReadTime : ioWriteTime;
+        currentChartInfo.ioTime = Math.round(Number(ioChoose / timeInterval));
+
+        timeIODatas.value.push(dateFormatForSecond(res.data.shotTime));
+        if (timeIODatas.value.length > 20) {
+            timeIODatas.value.splice(0, 1);
+        }
+        timeNetDatas.value.push(dateFormatForSecond(res.data.shotTime));
+        if (timeNetDatas.value.length > 20) {
+            timeNetDatas.value.splice(0, 1);
+        }
+        loadData();
+
+        currentInfo.value.ioReadBytes = resData.ioReadBytes;
+        currentInfo.value.ioWriteBytes = resData.ioWriteBytes;
+        currentInfo.value.ioCount = resData.ioCount;
+        currentInfo.value.ioReadTime = resData.ioReadTime;
+        currentInfo.value.ioWriteTime = resData.ioWriteTime;
+
+        currentInfo.value.netBytesSent = resData.netBytesSent;
+        currentInfo.value.netBytesRecv = resData.netBytesRecv;
     }
-    timeNetDatas.value.push(dateFormatForSecond(res.data.shotTime));
-    if (timeNetDatas.value.length > 20) {
-        timeNetDatas.value.splice(0, 1);
+    if (scope === 'gpu') {
+        currentInfo.value.gpuData = resData.gpuData;
+        currentInfo.value.xpuData = resData.xpuData;
     }
-    loadData();
-    currentInfo.value = res.data;
-    statusRef.value.acceptParams(currentInfo.value, baseInfo.value, isStatusInit.value);
+    if (scope === 'basic') {
+        currentInfo.value.uptime = resData.uptime;
+        currentInfo.value.timeSinceUptime = resData.timeSinceUptime;
+        currentInfo.value.procs = resData.procs;
+
+        currentInfo.value.load1 = resData.load1;
+        currentInfo.value.load5 = resData.load5;
+        currentInfo.value.load15 = resData.load15;
+        currentInfo.value.loadUsagePercent = resData.loadUsagePercent;
+
+        currentInfo.value.cpuPercent = resData.cpuPercent;
+        currentInfo.value.cpuUsedPercent = resData.cpuUsedPercent;
+        currentInfo.value.cpuUsed = resData.cpuUsed;
+        currentInfo.value.cpuTotal = resData.cpuTotal;
+
+        currentInfo.value.memoryTotal = resData.memoryTotal;
+        currentInfo.value.memoryAvailable = resData.memoryAvailable;
+        currentInfo.value.memoryUsed = resData.memoryUsed;
+        currentInfo.value.memoryUsedPercent = resData.memoryUsedPercent;
+
+        currentInfo.value.swapMemoryTotal = resData.swapMemoryTotal;
+        currentInfo.value.swapMemoryAvailable = resData.swapMemoryAvailable;
+        currentInfo.value.swapMemoryUsed = resData.swapMemoryUsed;
+        currentInfo.value.swapMemoryUsedPercent = resData.swapMemoryUsedPercent;
+
+        currentInfo.value.timeSinceUptime = res.data.timeSinceUptime;
+        currentInfo.value.shotTime = resData.shotTime;
+        currentInfo.value.diskData = resData.diskData;
+    }
 };
 
 function loadUpTime(uptime: number) {
@@ -469,37 +563,25 @@ function loadUpTime(uptime: number) {
     let hours = Math.floor((uptime % 86400) / 3600);
     let minutes = Math.floor((uptime % 3600) / 60);
     let seconds = uptime % 60;
+    let uptimeParts = [];
+    let lead = false;
     if (days !== 0) {
-        return (
-            days +
-            i18n.global.t('commons.units.day') +
-            ' ' +
-            hours +
-            i18n.global.t('commons.units.hour') +
-            ' ' +
-            minutes +
-            i18n.global.t('commons.units.minute') +
-            ' ' +
-            seconds +
-            i18n.global.t('commons.units.second')
-        );
+        uptimeParts.push(days + i18n.global.t('commons.units.dayUnit', days));
+        lead = true;
     }
-    if (hours !== 0) {
-        return (
-            hours +
-            i18n.global.t('commons.units.hour') +
-            ' ' +
-            minutes +
-            i18n.global.t('commons.units.minute') +
-            ' ' +
-            seconds +
-            i18n.global.t('commons.units.second')
-        );
+    if (lead || hours !== 0) {
+        uptimeParts.push(hours + i18n.global.t('commons.units.hourUnit', hours));
+        lead = true;
     }
-    if (minutes !== 0) {
-        return minutes + i18n.global.t('commons.units.minute') + ' ' + seconds + i18n.global.t('commons.units.second');
+    if (lead || minutes !== 0) {
+        uptimeParts.push(minutes + i18n.global.t('commons.units.minuteUnit', minutes));
+        lead = true;
     }
-    return seconds + i18n.global.t('commons.units.second');
+    if (lead || seconds !== 0) {
+        uptimeParts.push(seconds + i18n.global.t('commons.units.secondUnit', seconds));
+        lead = true;
+    }
+    return lead ? uptimeParts.join(' ') : '-';
 }
 
 const loadData = async () => {
@@ -542,7 +624,7 @@ const hideEntrance = () => {
 
 const loadUpgradeStatus = async () => {
     const res = await loadUpgradeInfo();
-    if (res.data) {
+    if (res.data.testVersion || res.data.newVersion || res.data.latestVersion) {
         globalStore.hasNewVersion = true;
     } else {
         globalStore.hasNewVersion = false;
@@ -592,6 +674,12 @@ onBeforeUnmount(() => {
         font-size: 14px;
         color: var(--el-text-color-regular);
     }
+    @media only screen and (max-width: 1300px) {
+        span:first-child {
+            font-size: 12px;
+            color: var(--el-text-color-regular);
+        }
+    }
 
     .count {
         margin-top: 10px;
@@ -607,7 +695,8 @@ onBeforeUnmount(() => {
 
 .h-systemInfo {
     margin-left: 18px;
-    height: 216px;
+    height: 296px;
+    overflow: auto;
 }
 @-moz-document url-prefix() {
     .h-systemInfo {
@@ -618,11 +707,20 @@ onBeforeUnmount(() => {
 .system-label {
     font-weight: 400 !important;
     font-size: 14px !important;
-    color: #1f2329;
+    color: var(--panel-text-color);
+    border: none !important;
+    background: none !important;
+    max-width: 150px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .system-content {
     font-size: 13px !important;
+    border: none !important;
+    width: 100% !important;
+    line-height: normal !important;
 }
 
 .monitor-tags {

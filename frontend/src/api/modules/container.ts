@@ -21,6 +21,9 @@ export const updateContainer = (params: Container.ContainerHelper) => {
 export const upgradeContainer = (name: string, image: string, forcePull: boolean) => {
     return http.post(`/containers/upgrade`, { name: name, image: image, forcePull: forcePull }, TimeoutEnum.T_10M);
 };
+export const commitContainer = (params: Container.ContainerCommit) => {
+    return http.post(`/containers/commit`, params);
+};
 export const loadContainerInfo = (name: string) => {
     return http.post<Container.ContainerHelper>(`/containers/info`, { name: name });
 };
@@ -40,13 +43,20 @@ export const containerRename = (params: Container.ContainerRename) => {
     return http.post(`/containers/rename`, params);
 };
 export const containerOperator = (params: Container.ContainerOperate) => {
-    return http.post(`/containers/operate`, params);
+    return http.post(`/containers/operate`, params, TimeoutEnum.T_60S);
 };
 export const containerPrune = (params: Container.ContainerPrune) => {
     return http.post<Container.ContainerPruneReport>(`/containers/prune`, params);
 };
 export const inspect = (params: Container.ContainerInspect) => {
     return http.post<string>(`/containers/inspect`, params);
+};
+
+export const DownloadFile = (params: Container.ContainerLogInfo) => {
+    return http.download<BlobPart>('/containers/download/log', params, {
+        responseType: 'blob',
+        timeout: TimeoutEnum.T_40S,
+    });
 };
 
 // image

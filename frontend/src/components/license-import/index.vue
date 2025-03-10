@@ -1,8 +1,8 @@
 <template>
     <div>
-        <el-dialog v-model="open" :close-on-click-modal="false" @close="handleClose">
+        <el-dialog class="level-up-pro" v-model="open" :close-on-click-modal="false" @close="handleClose">
             <div style="text-align: center" v-loading="loading">
-                <span class="text-3xl font-medium">{{ $t('license.levelUpPro') }}</span>
+                <span class="text-3xl font-medium title">{{ $t('license.levelUpPro') }}</span>
                 <el-row type="flex" justify="center" class="mt-6">
                     <el-col :span="22">
                         <el-upload
@@ -33,7 +33,7 @@
                     {{ $t('license.power') }}
                 </el-button>
                 <div class="mt-3 mb-5">
-                    <el-button text type="primary" @click="toHalo">{{ $t('license.knowMorePro') }}</el-button>
+                    <el-button text type="primary" @click="toLxware">{{ $t('license.knowMorePro') }}</el-button>
                 </div>
             </div>
         </el-dialog>
@@ -47,8 +47,11 @@ import { MsgSuccess } from '@/utils/message';
 import { UploadFileData } from '@/api/modules/setting';
 import { GlobalStore } from '@/store';
 import { UploadFile, UploadFiles, UploadInstance, UploadProps, UploadRawFile, genFileId } from 'element-plus';
+import { useTheme } from '@/hooks/use-theme';
+import { getXpackSetting, initFavicon } from '@/utils/xpack';
 const globalStore = GlobalStore();
 
+const { switchTheme } = useTheme();
 const loading = ref(false);
 const open = ref(false);
 const uploadRef = ref<UploadInstance>();
@@ -70,8 +73,12 @@ const handleExceed: UploadProps['onExceed'] = (files) => {
     uploadRef.value!.handleStart(file);
 };
 
-const toHalo = () => {
-    window.open('https://www.lxware.cn/1panel' + '', '_blank', 'noopener,noreferrer');
+const toLxware = () => {
+    if (!globalStore.isIntl) {
+        window.open('https://www.lxware.cn/1panel' + '', '_blank', 'noopener,noreferrer');
+    } else {
+        window.open('https://1panel.pro/pricing' + '', '_blank', 'noopener,noreferrer');
+    }
 };
 
 const submit = async () => {
@@ -84,10 +91,17 @@ const submit = async () => {
     loading.value = true;
     await UploadFileData(formData)
         .then(async () => {
+            globalStore.isProductPro = true;
+            const xpackRes = await getXpackSetting();
+            if (xpackRes) {
+                globalStore.themeConfig.theme = xpackRes.data.theme;
+                globalStore.themeConfig.themeColor = xpackRes.data.themeColor;
+            }
             loading.value = false;
+            switchTheme();
+            initFavicon();
             uploadRef.value!.clearFiles();
             uploaderFiles.value = [];
-            globalStore.isProductPro = true;
             open.value = false;
             MsgSuccess(i18n.global.t('commons.msg.operationSuccess'));
             window.location.reload();

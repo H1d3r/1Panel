@@ -6,22 +6,22 @@
             <span>{{ $t('container.startIn') }}</span>
         </el-card>
 
-        <LayoutContent :title="$t('container.composeTemplate')" :class="{ mask: dockerStatus != 'Running' }">
+        <LayoutContent :title="$t('container.composeTemplate', 2)" :class="{ mask: dockerStatus != 'Running' }">
             <template #toolbar>
-                <el-row>
-                    <el-col :span="16">
+                <div class="flex justify-between gap-2 flex-wrap sm:flex-row">
+                    <div class="flex flex-wrap gap-3">
                         <el-button type="primary" @click="onOpenDialog('create')">
                             {{ $t('container.createComposeTemplate') }}
                         </el-button>
                         <el-button type="primary" plain :disabled="selects.length === 0" @click="onBatchDelete(null)">
                             {{ $t('commons.button.delete') }}
                         </el-button>
-                    </el-col>
-                    <el-col :span="8">
+                    </div>
+                    <div class="flex flex-wrap gap-3">
                         <TableSetting @search="search()" />
                         <TableSearch @search="search()" v-model:searchName="searchName" />
-                    </el-col>
-                </el-row>
+                    </div>
+                </div>
             </template>
             <template #main>
                 <ComplexTable
@@ -31,15 +31,24 @@
                     @search="search"
                 >
                     <el-table-column type="selection" fix />
-                    <el-table-column :label="$t('commons.table.name')" min-width="100" prop="name" fix>
+                    <el-table-column
+                        :label="$t('commons.table.name')"
+                        min-width="100"
+                        prop="name"
+                        sortable
+                        fix
+                        show-overflow-tooltip
+                    >
                         <template #default="{ row }">
-                            <Tooltip @click="onOpenDetail(row)" :text="row.name" />
+                            <el-text type="primary" class="cursor-pointer" @click="onOpenDetail(row)">
+                                {{ row.name }}
+                            </el-text>
                         </template>
                     </el-table-column>
                     <el-table-column :label="$t('container.description')" prop="description" min-width="200" fix />
                     <el-table-column :label="$t('commons.table.createdAt')" min-width="80" fix>
                         <template #default="{ row }">
-                            {{ dateFormatSimple(row.createdAt) }}
+                            {{ dateFormat(0, 0, row.createdAt) }}
                         </template>
                     </el-table-column>
                     <fu-table-operations :buttons="buttons" :label="$t('commons.table.operate')" />
@@ -55,7 +64,7 @@
 
 <script lang="ts" setup>
 import { reactive, onMounted, ref } from 'vue';
-import { dateFormatSimple } from '@/utils/util';
+import { dateFormat } from '@/utils/util';
 import { Container } from '@/api/interface/container';
 import DetailDialog from '@/views/container/template/detail/index.vue';
 import OperatorDialog from '@/views/container/template/operator/index.vue';

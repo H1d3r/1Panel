@@ -1,6 +1,8 @@
 package service
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -33,12 +35,16 @@ type ISettingService interface {
 	GetSettingInfo() (*dto.SettingInfo, error)
 	LoadInterfaceAddr() ([]string, error)
 	Update(key, value string) error
+	UpdateProxy(req dto.ProxyUpdate) error
 	UpdatePassword(c *gin.Context, old, new string) error
 	UpdatePort(port uint) error
 	UpdateBindInfo(req dto.BindInfo) error
 	UpdateSSL(c *gin.Context, req dto.SSLUpdate) error
 	LoadFromCert() (*dto.SSLInfo, error)
 	HandlePasswordExpired(c *gin.Context, old, new string) error
+	GenerateApiKey() (string, error)
+	UpdateApiConfig(req dto.ApiInterfaceConfig) error
+	GenerateRSAKey() error
 }
 
 func NewISettingService() ISettingService {
@@ -62,6 +68,12 @@ func (u *SettingService) GetSettingInfo() (*dto.SettingInfo, error) {
 	if err := json.Unmarshal(arr, &info); err != nil {
 		return nil, err
 	}
+	if info.ProxyPasswdKeep != constant.StatusEnable {
+		info.ProxyPasswd = ""
+	} else {
+		info.ProxyPasswd, _ = encrypt.StringDecrypt(info.ProxyPasswd)
+	}
+
 	info.LocalTime = time.Now().Format("2006-01-02 15:04:05 MST -0700")
 	return &info, err
 }
@@ -111,7 +123,7 @@ func (u *SettingService) Update(key, value string) error {
 		if err != nil {
 			return err
 		}
-		if err := settingRepo.Update("ExpirationTime", time.Now().AddDate(0, 0, timeout).Format("2006-01-02 15:04:05")); err != nil {
+		if err := settingRepo.Update("ExpirationTime", time.Now().AddDate(0, 0, timeout).Format(constant.DateTimeLayout)); err != nil {
 			return err
 		}
 	case "BindDomain":
@@ -159,6 +171,29 @@ func (u *SettingService) UpdateBindInfo(req dto.BindInfo) error {
 			global.LOG.Errorf("restart system with new bind info failed, err: %v", err)
 		}
 	}()
+	return nil
+}
+
+func (u *SettingService) UpdateProxy(req dto.ProxyUpdate) error {
+	if err := settingRepo.Update("ProxyUrl", req.ProxyUrl); err != nil {
+		return err
+	}
+	if err := settingRepo.Update("ProxyType", req.ProxyType); err != nil {
+		return err
+	}
+	if err := settingRepo.Update("ProxyPort", req.ProxyPort); err != nil {
+		return err
+	}
+	if err := settingRepo.Update("ProxyUser", req.ProxyUser); err != nil {
+		return err
+	}
+	pass, _ := encrypt.StringEncrypt(req.ProxyPasswd)
+	if err := settingRepo.Update("ProxyPasswd", pass); err != nil {
+		return err
+	}
+	if err := settingRepo.Update("ProxyPasswdKeep", req.ProxyPasswdKeep); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -292,6 +327,9 @@ func (u *SettingService) UpdateSSL(c *gin.Context, req dto.SSLUpdate) error {
 	if err := settingRepo.Update("SSL", req.SSL); err != nil {
 		return err
 	}
+	if err := settingRepo.Update("AutoRestart", req.AutoRestart); err != nil {
+		return err
+	}
 
 	sID, _ := c.Cookie(constant.SessionName)
 	c.SetCookie(constant.SessionName, sID, 0, "", "", true, true)
@@ -317,12 +355,18 @@ func (u *SettingService) LoadFromCert() (*dto.SSLInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := loadInfoFromCert()
-	if err != nil {
-		return nil, err
-	}
+	var data dto.SSLInfo
 	switch sslType.Value {
-	case "import":
+	case "self":
+		data, err = loadInfoFromCert()
+		if err != nil {
+			return nil, err
+		}
+	case "import-paste", "import-local":
+		data, err = loadInfoFromCert()
+		if err != nil {
+			return nil, err
+		}
 		if _, err := os.Stat(path.Join(global.CONF.System.BaseDir, "1panel/secret/server.crt")); err != nil {
 			return nil, fmt.Errorf("load server.crt file failed, err: %v", err)
 		}
@@ -340,9 +384,15 @@ func (u *SettingService) LoadFromCert() (*dto.SSLInfo, error) {
 			return nil, err
 		}
 		id, _ := strconv.Atoi(sslID.Value)
+		ssl, err := websiteSSLRepo.GetFirst(commonRepo.WithByID(uint(id)))
+		if err != nil {
+			return nil, err
+		}
+		data.Domain = ssl.PrimaryDomain
 		data.SSLID = uint(id)
+		data.Timeout = ssl.ExpireDate.Format(constant.DateTimeLayout)
 	}
-	return data, nil
+	return &data, nil
 }
 
 func (u *SettingService) HandlePasswordExpired(c *gin.Context, old, new string) error {
@@ -368,7 +418,7 @@ func (u *SettingService) HandlePasswordExpired(c *gin.Context, old, new string) 
 			return err
 		}
 		timeout, _ := strconv.Atoi(expiredSetting.Value)
-		if err := settingRepo.Update("ExpirationTime", time.Now().AddDate(0, 0, timeout).Format("2006-01-02 15:04:05")); err != nil {
+		if err := settingRepo.Update("ExpirationTime", time.Now().AddDate(0, 0, timeout).Format(constant.DateTimeLayout)); err != nil {
 			return err
 		}
 		return nil
@@ -384,23 +434,23 @@ func (u *SettingService) UpdatePassword(c *gin.Context, old, new string) error {
 	return nil
 }
 
-func loadInfoFromCert() (*dto.SSLInfo, error) {
+func loadInfoFromCert() (dto.SSLInfo, error) {
 	var info dto.SSLInfo
 	certFile := path.Join(global.CONF.System.BaseDir, "1panel/secret/server.crt")
 	if _, err := os.Stat(certFile); err != nil {
-		return &info, err
+		return info, err
 	}
 	certData, err := os.ReadFile(certFile)
 	if err != nil {
-		return &info, err
+		return info, err
 	}
 	certBlock, _ := pem.Decode(certData)
 	if certBlock == nil {
-		return &info, err
+		return info, err
 	}
 	certObj, err := x509.ParseCertificate(certBlock.Bytes)
 	if err != nil {
-		return &info, err
+		return info, err
 	}
 	var domains []string
 	if len(certObj.IPAddresses) != 0 {
@@ -411,9 +461,9 @@ func loadInfoFromCert() (*dto.SSLInfo, error) {
 	if len(certObj.DNSNames) != 0 {
 		domains = append(domains, certObj.DNSNames...)
 	}
-	return &dto.SSLInfo{
+	return dto.SSLInfo{
 		Domain:   strings.Join(domains, ","),
-		Timeout:  certObj.NotAfter.Format("2006-01-02 15:04:05"),
+		Timeout:  certObj.NotAfter.Format(constant.DateTimeLayout),
 		RootPath: path.Join(global.CONF.System.BaseDir, "1panel/secret/server.crt"),
 	}, nil
 }
@@ -438,5 +488,78 @@ func checkCertValid() error {
 		return err
 	}
 
+	return nil
+}
+
+func (u *SettingService) GenerateApiKey() (string, error) {
+	apiKey := common.RandStr(32)
+	if err := settingRepo.Update("ApiKey", apiKey); err != nil {
+		return global.CONF.System.ApiKey, err
+	}
+	global.CONF.System.ApiKey = apiKey
+	return apiKey, nil
+}
+
+func (u *SettingService) UpdateApiConfig(req dto.ApiInterfaceConfig) error {
+	if err := settingRepo.Update("ApiInterfaceStatus", req.ApiInterfaceStatus); err != nil {
+		return err
+	}
+	global.CONF.System.ApiInterfaceStatus = req.ApiInterfaceStatus
+	if err := settingRepo.Update("ApiKey", req.ApiKey); err != nil {
+		return err
+	}
+	global.CONF.System.ApiKey = req.ApiKey
+	if err := settingRepo.Update("IpWhiteList", req.IpWhiteList); err != nil {
+		return err
+	}
+	global.CONF.System.IpWhiteList = req.IpWhiteList
+	if err := settingRepo.Update("ApiKeyValidityTime", req.ApiKeyValidityTime); err != nil {
+		return err
+	}
+	global.CONF.System.ApiKeyValidityTime = req.ApiKeyValidityTime
+	return nil
+}
+
+func exportPrivateKeyToPEM(privateKey *rsa.PrivateKey) string {
+	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: privateKeyBytes,
+	})
+	return string(privateKeyPEM)
+}
+
+func exportPublicKeyToPEM(publicKey *rsa.PublicKey) (string, error) {
+	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		return "", err
+	}
+	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: publicKeyBytes,
+	})
+	return string(publicKeyPEM), nil
+}
+
+func (u *SettingService) GenerateRSAKey() error {
+	priKey, _ := settingRepo.Get(settingRepo.WithByKey("PASSWORD_PRIVATE_KEY"))
+	pubKey, _ := settingRepo.Get(settingRepo.WithByKey("PASSWORD_PUBLIC_KEY"))
+	if priKey.Value != "" && pubKey.Value != "" {
+		return nil
+	}
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return err
+	}
+	privateKeyPEM := exportPrivateKeyToPEM(privateKey)
+	publicKeyPEM, err := exportPublicKeyToPEM(&privateKey.PublicKey)
+	err = settingRepo.UpdateOrCreate("PASSWORD_PRIVATE_KEY", privateKeyPEM)
+	if err != nil {
+		return err
+	}
+	err = settingRepo.UpdateOrCreate("PASSWORD_PUBLIC_KEY", publicKeyPEM)
+	if err != nil {
+		return err
+	}
 	return nil
 }

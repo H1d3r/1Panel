@@ -19,64 +19,16 @@
 </template>
 
 <script setup lang="ts" name="login">
-import { checkIsSafety } from '@/api/modules/auth';
 import LoginForm from './components/login-form.vue';
 import { ref, onMounted } from 'vue';
-import router from '@/routers';
 import { GlobalStore } from '@/store';
-import { initFavicon, resetXSetting } from '@/utils/xpack';
 
 const gStore = GlobalStore();
 const loading = ref();
 
 const screenWidth = ref(null);
 
-const getStatus = async () => {
-    loading.value = true;
-    await checkIsSafety(gStore.entrance)
-        .then((res) => {
-            if (res.data === 'unpass') {
-                loading.value = false;
-                router.replace({ name: 'entrance', params: { code: gStore.entrance } });
-                return;
-            }
-            loadDataFromXDB();
-        })
-        .catch(() => {
-            loading.value = false;
-        });
-};
-
-const loadDataFromXDB = async () => {
-    const xpackModules = import.meta.globEager('../../xpack/api/modules/*.ts');
-    if (xpackModules['../../xpack/api/modules/setting.ts']) {
-        const searchXSetting = xpackModules['../../xpack/api/modules/setting.ts'].searchXSetting;
-        if (searchXSetting) {
-            await searchXSetting()
-                .then((resItem) => {
-                    gStore.themeConfig.title = resItem.data.title;
-                    gStore.themeConfig.logo = resItem.data.logo;
-                    gStore.themeConfig.logoWithText = resItem.data.logoWithText;
-                    gStore.themeConfig.favicon = resItem.data.favicon;
-                })
-                .catch(() => {
-                    loading.value = false;
-                    resetXSetting();
-                });
-        } else {
-            loading.value = false;
-            resetXSetting();
-        }
-    } else {
-        loading.value = false;
-        resetXSetting();
-    }
-    loading.value = false;
-    initFavicon();
-};
-
 onMounted(() => {
-    getStatus();
     screenWidth.value = document.body.clientWidth;
     window.onresize = () => {
         return (() => {

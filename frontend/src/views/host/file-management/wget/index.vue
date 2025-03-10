@@ -1,5 +1,12 @@
 <template>
-    <el-drawer v-model="open" :before-close="handleClose" size="50%">
+    <el-drawer
+        v-model="open"
+        :destroy-on-close="true"
+        :before-close="handleClose"
+        size="50%"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+    >
         <template #header>
             <DrawerHeader :header="$t('file.download')" :back="handleClose" />
         </template>

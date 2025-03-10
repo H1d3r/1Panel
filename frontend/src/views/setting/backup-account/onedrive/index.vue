@@ -1,6 +1,12 @@
 <template>
     <div>
-        <el-drawer v-model="drawerVisible" :destroy-on-close="true" :close-on-click-modal="false" size="50%">
+        <el-drawer
+            v-model="drawerVisible"
+            :destroy-on-close="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            size="50%"
+        >
             <template #header>
                 <DrawerHeader :header="title + $t('setting.backupAccount')" :back="handleClose" />
             </template>
@@ -108,6 +114,9 @@ import { Backup } from '@/api/interface/backup';
 import DrawerHeader from '@/components/drawer-header/index.vue';
 import { addBackup, editBackup, getOneDriveInfo } from '@/api/modules/setting';
 import { MsgSuccess } from '@/utils/message';
+import { GlobalStore } from '@/store';
+
+const globalStore = GlobalStore();
 
 const loading = ref(false);
 type FormInstance = InstanceType<typeof ElForm>;
@@ -207,8 +216,11 @@ function callback(error: any) {
 }
 
 const toDoc = (isConf: boolean) => {
-    let item = isConf ? '#onedrive' : '#onedrive_1';
-    window.open('https://1panel.cn/docs/user_manual/settings/' + item, '_blank', 'noopener,noreferrer');
+    let item = isConf ? '#32-onedrive' : '#33-onedrive';
+    if (globalStore.isIntl) {
+        item = isConf ? '#using-your-own-client-info-for-onedrive' : '#auth-code-of-onedrive';
+    }
+    window.open(globalStore.docsUrl + '/user_manual/settings/' + item, '_blank', 'noopener,noreferrer');
 };
 
 const onSubmit = async (formEl: FormInstance | undefined) => {

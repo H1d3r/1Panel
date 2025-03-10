@@ -12,6 +12,8 @@ var (
 	appInstallRepo         = repo.NewIAppInstallRepo()
 	appInstallResourceRepo = repo.NewIAppInstallResourceRpo()
 
+	aiRepo = repo.NewIAiRepo()
+
 	mysqlRepo      = repo.NewIMysqlRepo()
 	postgresqlRepo = repo.NewIPostgresqlRepo()
 	databaseRepo   = repo.NewIDatabaseRepo()
@@ -24,6 +26,8 @@ var (
 	hostRepo    = repo.NewIHostRepo()
 	groupRepo   = repo.NewIGroupRepo()
 	commandRepo = repo.NewICommandRepo()
+	ftpRepo     = repo.NewIFtpRepo()
+	clamRepo    = repo.NewIClamRepo()
 
 	settingRepo = repo.NewISettingRepo()
 	backupRepo  = repo.NewIBackupRepo()

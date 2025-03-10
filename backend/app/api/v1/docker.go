@@ -11,10 +11,10 @@ import (
 
 // @Tags Container Docker
 // @Summary Load docker status
-// @Description 获取 docker 服务状态
 // @Produce json
 // @Success 200 {string} status
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /containers/docker/status [get]
 func (b *BaseApi) LoadDockerStatus(c *gin.Context) {
 	status := dockerService.LoadDockerStatus()
@@ -23,10 +23,10 @@ func (b *BaseApi) LoadDockerStatus(c *gin.Context) {
 
 // @Tags Container Docker
 // @Summary Load docker daemon.json
-// @Description 获取 docker 配置信息(表单)
 // @Produce json
 // @Success 200 {object} string
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /containers/daemonjson/file [get]
 func (b *BaseApi) LoadDaemonJsonFile(c *gin.Context) {
 	if _, err := os.Stat(constant.DaemonJsonPath); err != nil {
@@ -43,10 +43,10 @@ func (b *BaseApi) LoadDaemonJsonFile(c *gin.Context) {
 
 // @Tags Container Docker
 // @Summary Load docker daemon.json
-// @Description 获取 docker 配置信息
 // @Produce json
 // @Success 200 {object} dto.DaemonJsonConf
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /containers/daemonjson [get]
 func (b *BaseApi) LoadDaemonJson(c *gin.Context) {
 	conf := dockerService.LoadDockerConf()
@@ -55,13 +55,13 @@ func (b *BaseApi) LoadDaemonJson(c *gin.Context) {
 
 // @Tags Container Docker
 // @Summary Update docker daemon.json
-// @Description 修改 docker 配置信息
 // @Accept json
 // @Param request body dto.SettingUpdate true "request"
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /containers/daemonjson/update [post]
-// @x-panel-log {"bodyKeys":["key", "value"],"paramKeys":[],"BeforeFunctions":[],"formatZH":"更新 docker daemon.json 配置 [key]=>[value]","formatEN":"Updated the docker daemon.json configuration [key]=>[value]"}
+// @x-panel-log {"bodyKeys":["key", "value"],"paramKeys":[],"BeforeFunctions":[],"formatZH":"更新配置 [key]","formatEN":"Updated configuration [key]"}
 func (b *BaseApi) UpdateDaemonJson(c *gin.Context) {
 	var req dto.SettingUpdate
 	if err := helper.CheckBindAndValidate(&req, c); err != nil {
@@ -78,13 +78,13 @@ func (b *BaseApi) UpdateDaemonJson(c *gin.Context) {
 
 // @Tags Container Docker
 // @Summary Update docker daemon.json log option
-// @Description 修改 docker 日志配置
 // @Accept json
 // @Param request body dto.LogOption true "request"
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /containers/logoption/update [post]
-// @x-panel-log {"bodyKeys":[],"paramKeys":[],"BeforeFunctions":[],"formatZH":"更新 docker daemon.json 日志配置","formatEN":"Updated the docker daemon.json log option"}
+// @x-panel-log {"bodyKeys":[],"paramKeys":[],"BeforeFunctions":[],"formatZH":"更新日志配置","formatEN":"Updated the log option"}
 func (b *BaseApi) UpdateLogOption(c *gin.Context) {
 	var req dto.LogOption
 	if err := helper.CheckBind(&req, c); err != nil {
@@ -101,13 +101,13 @@ func (b *BaseApi) UpdateLogOption(c *gin.Context) {
 
 // @Tags Container Docker
 // @Summary Update docker daemon.json ipv6 option
-// @Description 修改 docker ipv6 配置
 // @Accept json
 // @Param request body dto.LogOption true "request"
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /containers/ipv6option/update [post]
-// @x-panel-log {"bodyKeys":[],"paramKeys":[],"BeforeFunctions":[],"formatZH":"更新 docker daemon.json ipv6 配置","formatEN":"Updated the docker daemon.json ipv6 option"}
+// @x-panel-log {"bodyKeys":[],"paramKeys":[],"BeforeFunctions":[],"formatZH":"更新 ipv6 配置","formatEN":"Updated the ipv6 option"}
 func (b *BaseApi) UpdateIpv6Option(c *gin.Context) {
 	var req dto.Ipv6Option
 	if err := helper.CheckBind(&req, c); err != nil {
@@ -124,13 +124,13 @@ func (b *BaseApi) UpdateIpv6Option(c *gin.Context) {
 
 // @Tags Container Docker
 // @Summary Update docker daemon.json by upload file
-// @Description 上传替换 docker 配置文件
 // @Accept json
 // @Param request body dto.DaemonJsonUpdateByFile true "request"
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /containers/daemonjson/update/byfile [post]
-// @x-panel-log {"bodyKeys":[],"paramKeys":[],"BeforeFunctions":[],"formatZH":"更新 docker daemon.json 配置","formatEN":"Updated the docker daemon.json configuration"}
+// @x-panel-log {"bodyKeys":[],"paramKeys":[],"BeforeFunctions":[],"formatZH":"更新配置文件","formatEN":"Updated configuration file"}
 func (b *BaseApi) UpdateDaemonJsonByFile(c *gin.Context) {
 	var req dto.DaemonJsonUpdateByFile
 	if err := helper.CheckBindAndValidate(&req, c); err != nil {
@@ -147,11 +147,11 @@ func (b *BaseApi) UpdateDaemonJsonByFile(c *gin.Context) {
 
 // @Tags Container Docker
 // @Summary Operate docker
-// @Description Docker 操作
 // @Accept json
 // @Param request body dto.DockerOperation true "request"
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /containers/docker/operate [post]
 // @x-panel-log {"bodyKeys":["operation"],"paramKeys":[],"BeforeFunctions":[],"formatZH":"docker 服务 [operation]","formatEN":"[operation] docker service"}
 func (b *BaseApi) OperateDocker(c *gin.Context) {

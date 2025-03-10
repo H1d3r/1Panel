@@ -12,6 +12,7 @@ import DefineOptions from 'unplugin-vue-define-options/vite';
 import AutoImport from 'unplugin-auto-import/vite';
 import Components from 'unplugin-vue-components/vite';
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers';
+import svgLoader from 'vite-svg-loader';
 
 const prefix = `monaco-editor/esm/vs`;
 
@@ -24,12 +25,14 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
             alias: {
                 '@': resolve(__dirname, './src'),
                 'vue-i18n': 'vue-i18n/dist/vue-i18n.cjs.js',
+                xpack: resolve(__dirname, './src/xpack'),
             },
         },
         css: {
             preprocessorOptions: {
                 scss: {
                     additionalData: `@use "@/styles/var.scss" as *;`,
+                    api: 'modern',
                 },
             },
         },
@@ -76,9 +79,13 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
                     }),
                 ],
             }),
+            svgLoader({
+                defaultImport: 'url',
+            }),
         ],
         esbuild: {
-            pure: viteEnv.VITE_DROP_CONSOLE ? ['console.log', 'debugger'] : [],
+            pure: viteEnv.VITE_DROP_CONSOLE ? ['console.log'] : [],
+            drop: viteEnv.VITE_DROP_CONSOLE && process.env.NODE_ENV === 'production' ? ['debugger'] : [],
         },
         build: {
             outDir: '../cmd/server/web',

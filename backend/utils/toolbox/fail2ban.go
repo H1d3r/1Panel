@@ -15,7 +15,7 @@ type Fail2ban struct{}
 const defaultPath = "/etc/fail2ban/jail.local"
 
 type FirewallClient interface {
-	Status() (bool, bool, bool, error)
+	Status() (bool, bool, bool)
 	Version() (string, error)
 	Operate(operate string) error
 	OperateSSHD(operate, ip string) error
@@ -131,9 +131,11 @@ func (f *Fail2ban) ListIgnore() ([]string, error) {
 }
 
 func initLocalFile() error {
-	if _, err := os.Create(defaultPath); err != nil {
+	f, err := os.Create(defaultPath)
+	if err != nil {
 		return err
 	}
+	defer f.Close()
 	initFile := `#DEFAULT-START
 [DEFAULT]
 bantime = 600

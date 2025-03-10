@@ -2,15 +2,15 @@ GOCMD=go
 GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOARCH=$(shell go env GOARCH)
-GOOS=$(shell go env GOOS )
+GOOS=$(shell go env GOOS)
 
-BASE_PAH := $(shell pwd)
-BUILD_PATH = $(BASE_PAH)/build
-WEB_PATH=$(BASE_PAH)/frontend
-SERVER_PATH=$(BASE_PAH)/backend
-MAIN= $(BASE_PAH)/cmd/server/main.go
+BASE_PATH := $(shell pwd)
+BUILD_PATH = $(BASE_PATH)/build
+WEB_PATH=$(BASE_PATH)/frontend
+SERVER_PATH=$(BASE_PATH)/backend
+MAIN= $(BASE_PATH)/cmd/server/main.go
 APP_NAME=1panel
-ASSERT_PATH= $(BASE_PAH)/cmd/server/web/assets
+ASSERT_PATH= $(BASE_PATH)/cmd/server/web/assets
 
 clean_assets:
 	rm -rf $(ASSERT_PATH)

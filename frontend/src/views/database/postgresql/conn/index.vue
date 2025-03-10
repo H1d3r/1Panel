@@ -1,5 +1,11 @@
 <template>
-    <el-drawer v-model="dialogVisible" :destroy-on-close="true" :close-on-click-modal="false" size="30%">
+    <el-drawer
+        v-model="dialogVisible"
+        :destroy-on-close="true"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+        size="30%"
+    >
         <template #header>
             <DrawerHeader :header="$t('database.databaseConnInfo')" :back="handleClose" />
         </template>
@@ -23,8 +29,8 @@
                                     <CopyButton :content="loadPgInfo(true)" type="icon" />
                                 </el-descriptions-item>
                                 <el-descriptions-item :label="$t('database.connPort')">
-                                    {{ form.port }}
-                                    <CopyButton :content="form.port + ''" type="icon" />
+                                    5432
+                                    <CopyButton content="5432" type="icon" />
                                 </el-descriptions-item>
                             </el-descriptions>
                         </el-card>
@@ -75,14 +81,19 @@
                             :rules="Rules.paramComplexity"
                             prop="password"
                         >
-                            <el-input type="password" show-password clearable v-model="form.password">
-                                <template #append>
-                                    <CopyButton :content="form.password" />
-                                    <el-button @click="random" class="p-ml-5">
-                                        {{ $t('commons.button.random') }}
-                                    </el-button>
-                                </template>
-                            </el-input>
+                            <el-input
+                                style="width: calc(100% - 205px)"
+                                type="password"
+                                show-password
+                                clearable
+                                v-model="form.password"
+                            />
+                            <el-button-group>
+                                <CopyButton class="copy_button" :content="form.password" />
+                                <el-button @click="random">
+                                    {{ $t('commons.button.random') }}
+                                </el-button>
+                            </el-button-group>
                         </el-form-item>
                     </div>
                     <div v-if="form.from !== 'local'">
@@ -106,7 +117,7 @@
                 <el-button :disabled="loading" @click="dialogVisible = false">
                     {{ $t('commons.button.cancel') }}
                 </el-button>
-                <el-button :disabled="loading" type="primary" @click="onSave(formRef)">
+                <el-button :disabled="loading || form.status !== 'Running'" type="primary" @click="onSave(formRef)">
                     {{ $t('commons.button.confirm') }}
                 </el-button>
             </span>
@@ -131,6 +142,7 @@ const loading = ref(false);
 
 const dialogVisible = ref(false);
 const form = reactive({
+    status: '',
     systemIP: '',
     password: '',
     containerName: '',
@@ -196,6 +208,7 @@ const loadSystemIP = async () => {
 const loadPassword = async () => {
     if (form.from === 'local') {
         const res = await GetAppConnInfo(form.type, form.database);
+        form.status = res.data.status;
         form.username = res.data.username || '';
         form.password = res.data.password || '';
         form.port = res.data.port || 5432;
@@ -249,3 +262,14 @@ defineExpose({
     acceptParams,
 });
 </script>
+
+<style lang="scss" scoped>
+.copy_button {
+    border-radius: 0px;
+    border-left-width: 0px;
+}
+:deep(.el-input__wrapper) {
+    border-top-right-radius: 0px;
+    border-bottom-right-radius: 0px;
+}
+</style>

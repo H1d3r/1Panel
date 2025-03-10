@@ -1,5 +1,11 @@
 <template>
-    <el-drawer v-model="drawerVisible" :destroy-on-close="true" :close-on-click-modal="false" size="50%">
+    <el-drawer
+        v-model="drawerVisible"
+        :destroy-on-close="true"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+        size="50%"
+    >
         <template #header>
             <DrawerHeader
                 :hideResource="dialogData.title === 'create'"
@@ -21,6 +27,7 @@
                     </el-form-item>
                     <el-form-item :label="$t('database.version')" prop="version">
                         <el-radio-group v-model="dialogData.rowData!.version" @change="isOK = false">
+                            <el-radio label="17.x" value="17.x" />
                             <el-radio label="16.x" value="16.x" />
                             <el-radio label="15.x" value="15.x" />
                             <el-radio label="14.x" value="14.x" />
@@ -102,7 +109,7 @@ const handleClose = () => {
 };
 
 const rules = reactive({
-    name: [Rules.requiredInput],
+    name: [Rules.simpleName, Rules.noSpace],
     type: [Rules.requiredSelect],
     version: [Rules.requiredSelect],
     address: [Rules.ipV4V6OrDomain],

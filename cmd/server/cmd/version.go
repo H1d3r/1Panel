@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/1Panel-dev/1Panel/backend/configs"
+	"github.com/1Panel-dev/1Panel/backend/i18n"
 	"github.com/1Panel-dev/1Panel/cmd/server/conf"
 	"gopkg.in/yaml.v3"
 
@@ -15,11 +16,11 @@ func init() {
 }
 
 var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "获取系统版本信息",
+	Use: "version",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		i18n.UseI18nForCmd(language)
 		if !isRoot() {
-			fmt.Println("请使用 sudo 1pctl version 或者切换到 root 用户")
+			fmt.Println(i18n.GetMsgWithMapForCmd("SudoHelper", map[string]interface{}{"cmd": "sudo 1pctl version"}))
 			return nil
 		}
 		db, err := loadDBConn()
@@ -28,12 +29,12 @@ var versionCmd = &cobra.Command{
 		}
 		version := getSettingByKey(db, "SystemVersion")
 
-		fmt.Printf("1panel version: %s\n", version)
+		fmt.Println(i18n.GetMsgByKeyForCmd("SystemVersion") + version)
 		config := configs.ServerConfig{}
 		if err := yaml.Unmarshal(conf.AppYaml, &config); err != nil {
-			return fmt.Errorf("unmarshal conf.App.Yaml failed, errL %v", err)
+			return fmt.Errorf("unmarshal conf.App.Yaml failed, err: %v", err)
 		} else {
-			fmt.Printf("mode: %s\n", config.System.Mode)
+			fmt.Println(i18n.GetMsgByKeyForCmd("SystemMode") + config.System.Mode)
 		}
 		return nil
 	},

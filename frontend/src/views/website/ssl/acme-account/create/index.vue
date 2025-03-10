@@ -1,7 +1,7 @@
 <template>
     <el-dialog
         v-model="open"
-        :title="$t('website.addAccount')"
+        :title="$t('commons.button.create')"
         :close-on-click-modal="false"
         width="30%"
         :before-close="handleClose"
@@ -45,7 +45,14 @@
                         <el-form-item label="EAB HmacKey" prop="eabHmacKey">
                             <el-input v-model.trim="account.eabHmacKey"></el-input>
                         </el-form-item>
-                        <span v-html="$t('ssl.googleHelper')"></span>
+                        <el-link
+                            class="ml-1.5"
+                            type="primary"
+                            target="_blank"
+                            href="https://cloud.google.com/certificate-manager/docs/public-ca-tutorial?hl=zh-cn"
+                        >
+                            {{ $t('ssl.googleHelper') }}
+                        </el-link>
                     </div>
                 </el-form>
             </el-col>

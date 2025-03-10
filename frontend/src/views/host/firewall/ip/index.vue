@@ -18,22 +18,22 @@
                     <span>{{ $t('firewall.firewallNotStart') }}</span>
                 </el-card>
 
-                <LayoutContent :title="$t('firewall.ipRule')" :class="{ mask: fireStatus != 'running' }">
+                <LayoutContent :title="$t('firewall.ipRule', 2)" :class="{ mask: fireStatus != 'running' }">
                     <template #toolbar>
-                        <el-row>
-                            <el-col :span="16">
+                        <div class="flex justify-between gap-2 flex-wrap sm:flex-row">
+                            <div class="flex flex-wrap gap-3">
                                 <el-button type="primary" @click="onOpenDialog('create')">
-                                    {{ $t('commons.button.create') }} {{ $t('firewall.ipRule') }}
+                                    {{ $t('firewall.createIpRule') }}
                                 </el-button>
                                 <el-button @click="onDelete(null)" plain :disabled="selects.length === 0">
                                     {{ $t('commons.button.delete') }}
                                 </el-button>
-                            </el-col>
-                            <el-col :span="8">
+                            </div>
+                            <div class="flex flex-wrap gap-3">
                                 <TableSetting @search="search()" />
                                 <TableSearch @search="search()" v-model:searchName="searchName" />
-                            </el-col>
-                        </el-row>
+                            </div>
+                        </div>
                     </template>
                     <template #search>
                         <div class="flx-align-center">
@@ -99,15 +99,15 @@
                 <LayoutContent :title="$t('firewall.firewall')" :divider="true">
                     <template #main>
                         <div class="app-warn">
-                            <div>
+                            <div class="flex flex-col gap-2 items-center justify-center w-full sm:flex-row">
                                 <span>{{ $t('firewall.notSupport') }}</span>
-                                <span @click="toDoc">
-                                    <el-icon class="ml-2"><Position /></el-icon>
+                                <span @click="toDoc" class="flex items-center justify-center gap-0.5">
+                                    <el-icon><Position /></el-icon>
                                     {{ $t('firewall.quickJump') }}
                                 </span>
-                                <div>
-                                    <img src="@/assets/images/no_app.svg" />
-                                </div>
+                            </div>
+                            <div>
+                                <img src="@/assets/images/no_app.svg" />
                             </div>
                         </div>
                     </template>
@@ -130,6 +130,10 @@ import { Host } from '@/api/interface/host';
 import { ElMessageBox } from 'element-plus';
 import i18n from '@/lang';
 import { MsgSuccess } from '@/utils/message';
+import { Position } from '@element-plus/icons-vue';
+import { GlobalStore } from '@/store';
+
+const globalStore = GlobalStore();
 
 const loading = ref();
 const activeTag = ref('address');
@@ -194,7 +198,7 @@ const onOpenDialog = async (
 };
 
 const toDoc = () => {
-    window.open('https://1panel.cn/docs/user_manual/hosts/firewall/', '_blank', 'noopener,noreferrer');
+    window.open(globalStore.docsUrl + '/user_manual/hosts/firewall/', '_blank', 'noopener,noreferrer');
 };
 
 const onChange = async (info: any) => {

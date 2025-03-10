@@ -2,16 +2,18 @@
     <div v-loading="loading">
         <div class="app-status" style="margin-top: 20px">
             <el-card v-if="form.isExist">
-                <div>
-                    <el-tag effect="dark" type="success">Fail2ban</el-tag>
-                    <el-tag round class="status-content" v-if="form.isActive" type="success">
-                        {{ $t('commons.status.running') }}
-                    </el-tag>
-                    <el-tag round class="status-content" v-if="!form.isActive" type="info">
-                        {{ $t('commons.status.stopped') }}
-                    </el-tag>
-                    <el-tag class="status-content">{{ form.version }}</el-tag>
-                    <span class="buttons">
+                <div class="flex w-full flex-col gap-4 md:flex-row">
+                    <div class="flex flex-wrap gap-4">
+                        <el-tag effect="dark" type="success">Fail2ban</el-tag>
+                        <el-tag round v-if="form.isActive" type="success">
+                            {{ $t('commons.status.running') }}
+                        </el-tag>
+                        <el-tag round v-if="!form.isActive" type="info">
+                            {{ $t('commons.status.stopped') }}
+                        </el-tag>
+                        <el-tag>{{ form.version }}</el-tag>
+                    </div>
+                    <div class="mt-0.5">
                         <el-button v-if="form.isActive" type="primary" @click="onOperate('stop')" link>
                             {{ $t('commons.button.stop') }}
                         </el-button>
@@ -34,7 +36,7 @@
                             @change="onOperate(autoStart)"
                             v-model="autoStart"
                         />
-                    </span>
+                    </div>
                 </div>
             </el-card>
         </div>
@@ -42,16 +44,16 @@
         <div v-if="form.isExist">
             <LayoutContent title="Fail2ban" :divider="true">
                 <template #toolbar>
-                    <el-row>
-                        <el-col :span="16">
+                    <div class="flex w-full flex-col gap-4 md:justify-between md:flex-row">
+                        <div class="flex flex-wrap gap-4">
                             <el-button :disabled="!form.isActive" type="primary" plain @click="onLoadList('ignore')">
                                 {{ $t('toolbox.fail2ban.ignoreIP') }}
                             </el-button>
                             <el-button :disabled="!form.isActive" type="primary" plain @click="onLoadList('banned')">
                                 {{ $t('toolbox.fail2ban.bannedIP') }}
                             </el-button>
-                        </el-col>
-                    </el-row>
+                        </div>
+                    </div>
                 </template>
                 <template #main>
                     <el-radio-group v-model="confShowType" @change="changeMode">
@@ -147,15 +149,15 @@
             <LayoutContent title="Fail2ban" :divider="true">
                 <template #main>
                     <div class="app-warn">
-                        <div>
+                        <div class="flex flex-col gap-2 items-center justify-center w-full sm:flex-row">
                             <span>{{ $t('toolbox.fail2ban.noFail2ban') }}</span>
-                            <span @click="toDoc">
-                                <el-icon class="ml-2"><Position /></el-icon>
+                            <span @click="toDoc" class="flex items-center justify-center gap-0.5">
+                                <el-icon><Position /></el-icon>
                                 {{ $t('firewall.quickJump') }}
                             </span>
-                            <div>
-                                <img src="@/assets/images/no_app.svg" />
-                            </div>
+                        </div>
+                        <div>
+                            <img src="@/assets/images/no_app.svg" />
                         </div>
                     </div>
                 </template>
@@ -190,6 +192,9 @@ import { MsgSuccess } from '@/utils/message';
 import { getFail2banConf, getFail2banBase, operateFail2ban, updateFail2banByFile } from '@/api/modules/toolbox';
 import { ElMessageBox } from 'element-plus';
 import { transTimeUnit } from '@/utils/util';
+import { GlobalStore } from '@/store';
+
+const globalStore = GlobalStore();
 
 const loading = ref(false);
 const formRef = ref();
@@ -228,7 +233,7 @@ const onLoadList = async (type: string) => {
 };
 
 const toDoc = () => {
-    window.open('https://1panel.cn/docs/user_manual/toolbox/fail2ban/', '_blank', 'noopener,noreferrer');
+    window.open(globalStore.docsUrl + '/user_manual/toolbox/fail2ban/', '_blank', 'noopener,noreferrer');
 };
 
 const onSaveFile = async () => {

@@ -3,7 +3,9 @@ package postgresql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/1Panel-dev/1Panel/backend/buserr"
@@ -31,7 +33,11 @@ func NewPostgresqlClient(conn client.DBInfo) (PostgresqlClient, error) {
 		return client.NewLocal(connArgs, conn.Address, conn.Username, conn.Password, conn.Database), nil
 	}
 
-	connArgs := fmt.Sprintf("postgres://%s:%s@%s:%d/?sslmode=disable", conn.Username, conn.Password, conn.Address, conn.Port)
+	// Escape username and password to handle special characters
+	escapedUsername := url.QueryEscape(conn.Username)
+	escapedPassword := url.QueryEscape(conn.Password)
+
+	connArgs := fmt.Sprintf("postgres://%s:%s@%s:%d/?sslmode=disable", escapedUsername, escapedPassword, conn.Address, conn.Port)
 	db, err := sql.Open("pgx", connArgs)
 	if err != nil {
 		return nil, err
@@ -42,7 +48,7 @@ func NewPostgresqlClient(conn client.DBInfo) (PostgresqlClient, error) {
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
 	}
-	if ctx.Err() == context.DeadlineExceeded {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return nil, buserr.New(constant.ErrExecTimeOut)
 	}
 

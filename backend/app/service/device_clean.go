@@ -1,12 +1,18 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/1Panel-dev/1Panel/backend/constant"
+	"github.com/1Panel-dev/1Panel/backend/utils/docker"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 
 	"github.com/1Panel-dev/1Panel/backend/app/dto"
 	"github.com/1Panel-dev/1Panel/backend/global"
@@ -67,7 +73,7 @@ func (u *DeviceService) Scan() dto.CleanData {
 	snapTree := loadSnapshotTree(fileOp)
 	snapSize := uint64(0)
 	for _, snap := range snapTree {
-		snapSize += uint64(snap.Size)
+		snapSize += snap.Size
 	}
 	treeData = append(treeData, dto.CleanTree{
 		ID:          uuid.NewString(),
@@ -82,7 +88,7 @@ func (u *DeviceService) Scan() dto.CleanData {
 	rollBackTree := loadRollBackTree(fileOp)
 	rollbackSize := uint64(0)
 	for _, rollback := range rollBackTree {
-		rollbackSize += uint64(rollback.Size)
+		rollbackSize += rollback.Size
 	}
 	treeData = append(treeData, dto.CleanTree{
 		ID:          uuid.NewString(),
@@ -108,7 +114,7 @@ func (u *DeviceService) Scan() dto.CleanData {
 	unusedTree := loadUnusedFile(fileOp)
 	unusedSize := uint64(0)
 	for _, unused := range unusedTree {
-		unusedSize += uint64(unused.Size)
+		unusedSize += unused.Size
 	}
 	treeData = append(treeData, dto.CleanTree{
 		ID:          uuid.NewString(),
@@ -129,6 +135,9 @@ func (u *DeviceService) Scan() dto.CleanData {
 
 	logTree := loadLogTree(fileOp)
 	SystemClean.SystemLogClean = append(SystemClean.SystemLogClean, logTree...)
+
+	containerTree := loadContainerTree()
+	SystemClean.ContainerClean = append(SystemClean.ContainerClean, containerTree...)
 
 	return SystemClean
 }
@@ -259,10 +268,18 @@ func (u *DeviceService) Clean(req []dto.Clean) {
 			} else {
 				_ = cronjobRepo.DeleteRecord(cronjobRepo.WithByRecordFile(pathItem))
 			}
+		case "images":
+			dropImages()
+		case "containers":
+			dropContainers()
+		case "volumes":
+			dropVolumes()
+		case "build_cache":
+			dropBuildCache()
 		}
 	}
 
-	_ = settingRepo.Update("LastCleanTime", time.Now().Format("2006-01-02 15:04:05"))
+	_ = settingRepo.Update("LastCleanTime", time.Now().Format(constant.DateTimeLayout))
 	_ = settingRepo.Update("LastCleanSize", fmt.Sprintf("%v", size))
 	_ = settingRepo.Update("LastCleanData", fmt.Sprintf("%v", len(req)))
 
@@ -326,7 +343,7 @@ func (u *DeviceService) CleanForCronjob() (string, error) {
 			}
 		}
 	}
-	timeNow := time.Now().Format("2006-01-02 15:04:05")
+	timeNow := time.Now().Format(constant.DateTimeLayout)
 	dropFileOrDirWithLog(path.Join(global.CONF.System.BaseDir, dockerLogPath), &logs, &size, &fileCount)
 	logs += fmt.Sprintf("\n%s: total clean: %s, total count: %d", timeNow, common.LoadSizeUnit2F(float64(size)), fileCount)
 
@@ -496,6 +513,50 @@ func loadLogTree(fileOp fileUtils.FileOp) []dto.CleanTree {
 	return treeData
 }
 
+func loadContainerTree() []dto.CleanTree {
+	var treeData []dto.CleanTree
+	client, err := docker.NewDockerClient()
+	if err != nil {
+		return treeData
+	}
+	diskUsage, err := client.DiskUsage(context.Background(), types.DiskUsageOptions{})
+	if err != nil {
+		return treeData
+	}
+	imageSize := uint64(0)
+	for _, file := range diskUsage.Images {
+		if file.Containers == 0 {
+			imageSize += uint64(file.Size)
+		}
+	}
+	treeData = append(treeData, dto.CleanTree{ID: uuid.NewString(), Label: "container_images", Size: imageSize, Children: nil, Type: "images", IsRecommend: true})
+
+	containerSize := uint64(0)
+	for _, file := range diskUsage.Containers {
+		if file.State != "running" {
+			containerSize += uint64(file.SizeRw)
+		}
+	}
+	treeData = append(treeData, dto.CleanTree{ID: uuid.NewString(), Label: "container_containers", Size: containerSize, Children: nil, Type: "containers", IsRecommend: true})
+
+	volumeSize := uint64(0)
+	for _, file := range diskUsage.Volumes {
+		if file.UsageData.RefCount <= 0 {
+			volumeSize += uint64(file.UsageData.Size)
+		}
+	}
+	treeData = append(treeData, dto.CleanTree{ID: uuid.NewString(), Label: "container_volumes", Size: volumeSize, Children: nil, Type: "volumes", IsRecommend: true})
+
+	var buildCacheTotalSize int64
+	for _, cache := range diskUsage.BuildCache {
+		if cache.Type == "source.local" {
+			buildCacheTotalSize += cache.Size
+		}
+	}
+	treeData = append(treeData, dto.CleanTree{ID: uuid.NewString(), Label: "build_cache", Size: uint64(buildCacheTotalSize), Type: "build_cache", IsRecommend: true})
+	return treeData
+}
+
 func loadTreeWithDir(isCheck bool, treeType, pathItem string, fileOp fileUtils.FileOp) []dto.CleanTree {
 	var lists []dto.CleanTree
 	files, err := os.ReadDir(pathItem)
@@ -583,6 +644,63 @@ func dropFileOrDir(itemPath string) {
 	global.LOG.Debugf("drop file %s", itemPath)
 	if err := os.RemoveAll(itemPath); err != nil {
 		global.LOG.Errorf("drop file %s failed, err %v", itemPath, err)
+	}
+}
+
+func dropBuildCache() {
+	client, err := docker.NewDockerClient()
+	if err != nil {
+		global.LOG.Errorf("do not get docker client")
+	}
+	opts := types.BuildCachePruneOptions{}
+	opts.All = true
+	_, err = client.BuildCachePrune(context.Background(), opts)
+	if err != nil {
+		global.LOG.Errorf("drop build cache failed, err %v", err)
+	}
+}
+
+func dropImages() {
+	client, err := docker.NewDockerClient()
+	if err != nil {
+		global.LOG.Errorf("do not get docker client")
+	}
+	pruneFilters := filters.NewArgs()
+	pruneFilters.Add("dangling", "false")
+	_, err = client.ImagesPrune(context.Background(), pruneFilters)
+	if err != nil {
+		global.LOG.Errorf("drop images failed, err %v", err)
+	}
+}
+
+func dropContainers() {
+	client, err := docker.NewDockerClient()
+	if err != nil {
+		global.LOG.Errorf("do not get docker client")
+	}
+	pruneFilters := filters.NewArgs()
+	_, err = client.ContainersPrune(context.Background(), pruneFilters)
+	if err != nil {
+		global.LOG.Errorf("drop containers failed, err %v", err)
+	}
+}
+
+func dropVolumes() {
+	client, err := docker.NewDockerClient()
+	if err != nil {
+		global.LOG.Errorf("do not get docker client")
+	}
+	pruneFilters := filters.NewArgs()
+	versions, err := client.ServerVersion(context.Background())
+	if err != nil {
+		global.LOG.Errorf("do not get docker api versions")
+	}
+	if common.ComparePanelVersion(versions.APIVersion, "1.42") {
+		pruneFilters.Add("all", "true")
+	}
+	_, err = client.VolumesPrune(context.Background(), pruneFilters)
+	if err != nil {
+		global.LOG.Errorf("drop volumes failed, err %v", err)
 	}
 }
 

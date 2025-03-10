@@ -1,5 +1,5 @@
 <template>
-    <el-drawer :close-on-click-modal="false" v-model="open" size="50%">
+    <el-drawer :close-on-click-modal="false" :close-on-press-escape="false" v-model="open" size="50%">
         <template #header>
             <DrawerHeader :header="$t('website.create')" :back="handleClose">
                 <template #buttons>
@@ -163,6 +163,10 @@
                                     <el-select v-model="website.runtimeType" @change="changeRuntimeType()">
                                         <el-option label="PHP" value="php"></el-option>
                                         <el-option label="Node.js" value="node"></el-option>
+                                        <el-option label="Java" value="java"></el-option>
+                                        <el-option label="Go" value="go"></el-option>
+                                        <el-option label="Python" value="python"></el-option>
+                                        <el-option label=".NET" value="dotnet"></el-option>
                                     </el-select>
                                 </el-form-item>
                             </el-col>
@@ -246,7 +250,7 @@
                             >
                                 <template #append>{{ $t('app.cpuCore') }}</template>
                             </el-input>
-                            <span class="input-help">{{ $t('container.limitHelper') }}</span>
+                            <span class="input-help">{{ $t('container.limitHelper', [99999]) }}</span>
                         </el-form-item>
                         <el-form-item :label="$t('container.memoryLimit')" prop="appinstall.memoryLimit">
                             <el-input style="width: 40%" v-model.number="website.appinstall.memoryLimit" maxlength="10">
@@ -262,7 +266,7 @@
                                     </el-select>
                                 </template>
                             </el-input>
-                            <span class="input-help">{{ $t('container.limitHelper') }}</span>
+                            <span class="input-help">{{ $t('container.limitHelper', ['9999999999']) }}</span>
                         </el-form-item>
                         <el-form-item prop="allowPort" v-if="website.type === 'deployment'">
                             <el-checkbox
@@ -300,6 +304,33 @@
                             </span>
                         </div>
                     </el-form-item>
+
+                    <el-form-item prop="enableFtp" v-if="website.type === 'static' || website.type === 'runtime'">
+                        <el-checkbox
+                            @change="random"
+                            v-model="website.enableFtp"
+                            :label="$t('website.enableFtp')"
+                            size="large"
+                        />
+                        <span class="input-help">{{ $t('website.ftpHelper') }}</span>
+                    </el-form-item>
+                    <el-row :gutter="20" v-if="website.enableFtp">
+                        <el-col :span="12">
+                            <el-form-item prop="ftpUser" :label="$t('website.ftpUser')">
+                                <el-input v-model="website.ftpUser" />
+                            </el-form-item>
+                        </el-col>
+                        <el-col :span="12">
+                            <el-form-item prop="ftpPassword" :label="$t('website.ftpPassword')">
+                                <el-input type="password" clearable v-model="website.ftpPassword" show-password>
+                                    <template #append>
+                                        <el-button @click="random">{{ $t('commons.button.random') }}</el-button>
+                                    </template>
+                                </el-input>
+                            </el-form-item>
+                        </el-col>
+                    </el-row>
+
                     <el-form-item
                         v-if="website.type === 'proxy'"
                         :label="$t('website.proxyAddress')"
@@ -316,7 +347,7 @@
                         </el-input>
                     </el-form-item>
                     <el-form-item :label="$t('website.remark')" prop="remark">
-                        <el-input v-model="website.remark"></el-input>
+                        <el-input type="textarea" :rows="3" clearable v-model="website.remark" />
                     </el-form-item>
                 </el-form>
             </el-col>
@@ -349,11 +380,12 @@ import { ElForm, FormInstance } from 'element-plus';
 import { reactive, ref } from 'vue';
 import Params from '@/views/app-store/detail/params/index.vue';
 import Check from '../check/index.vue';
-import { MsgSuccess } from '@/utils/message';
+import { MsgError, MsgSuccess } from '@/utils/message';
 import { GetGroupList } from '@/api/modules/group';
 import { Group } from '@/api/interface/group';
 import { SearchRuntimes } from '@/api/modules/runtime';
 import { Runtime } from '@/api/interface/runtime';
+import { getRandomStr } from '@/utils/util';
 
 const websiteForm = ref<FormInstance>();
 const website = ref({
@@ -383,6 +415,9 @@ const website = ref({
         allowPort: false,
     },
     IPV6: false,
+    enableFtp: false,
+    ftpUser: '',
+    ftpPassword: '',
     proxyType: 'tcp',
     port: 9000,
     proxyProtocol: 'http://',
@@ -406,6 +441,8 @@ const rules = ref<any>({
         memoryLimit: [Rules.requiredInput, checkNumberRange(0, 9999999999)],
         containerName: [Rules.containerName],
     },
+    ftpUser: [Rules.simpleName],
+    ftpPassword: [Rules.simplePassword],
     proxyType: [Rules.requiredSelect],
     port: [Rules.port],
     runtimeType: [Rules.requiredInput],
@@ -443,6 +480,10 @@ const handleClose = () => {
     em('close', false);
 };
 
+const random = async () => {
+    website.value.ftpPassword = getRandomStr(16);
+};
+
 const changeType = (type: string) => {
     switch (type) {
         case 'deployment':
@@ -464,8 +505,8 @@ const changeType = (type: string) => {
 
 const searchAppInstalled = () => {
     GetAppInstalled({ type: 'website', unused: true, all: true, page: 1, pageSize: 100 }).then((res) => {
-        appInstalls.value = res.data;
-        if (res.data && res.data.length > 0) {
+        appInstalls.value = res.data.items;
+        if (res.data.items && res.data.items.length > 0) {
             website.value.appInstallId = res.data[0].id;
         }
     });
@@ -582,6 +623,16 @@ const changeAppType = (type: string) => {
     }
 };
 
+function isSubsetOfStrArray(primaryDomain: string, otherDomains: string): boolean {
+    const arr: string[] = otherDomains.split('\n');
+    for (const item of arr) {
+        if (primaryDomain === item) {
+            return false;
+        }
+    }
+    return true;
+}
+
 const submit = async (formEl: FormInstance | undefined) => {
     if (!formEl) return;
     await formEl.validate((valid) => {
@@ -589,6 +640,12 @@ const submit = async (formEl: FormInstance | undefined) => {
             return;
         }
         loading.value = true;
+        const flag = isSubsetOfStrArray(website.value.primaryDomain, website.value.otherDomains);
+        if (!flag) {
+            MsgError(i18n.global.t('website.containWarn'));
+            loading.value = false;
+            return;
+        }
         PreCheck({})
             .then((res) => {
                 if (res.data) {
@@ -597,6 +654,10 @@ const submit = async (formEl: FormInstance | undefined) => {
                 } else {
                     if (website.value.type === 'proxy') {
                         website.value.proxy = website.value.proxyProtocol + website.value.proxyAddress;
+                    }
+                    if (!website.value.enableFtp) {
+                        website.value.ftpUser = '';
+                        website.value.ftpPassword = '';
                     }
                     CreateWebsite(website.value)
                         .then(() => {

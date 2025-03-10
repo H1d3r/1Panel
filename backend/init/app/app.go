@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/1Panel-dev/1Panel/backend/utils/docker"
+	"github.com/1Panel-dev/1Panel/backend/utils/firewall"
 	"path"
 
 	"github.com/1Panel-dev/1Panel/backend/constant"
@@ -30,7 +31,15 @@ func Init() {
 		createDir(fileOp, dir)
 	}
 
-	_ = docker.CreateDefaultDockerNetwork()
+	go func() {
+		_ = docker.CreateDefaultDockerNetwork()
+
+		if f, err := firewall.NewFirewallClient(); err == nil {
+			if err = f.EnableForward(); err != nil {
+				global.LOG.Errorf("init port forward failed, err: %v", err)
+			}
+		}
+	}()
 }
 
 func createDir(fileOp files.FileOp, dirPath string) {

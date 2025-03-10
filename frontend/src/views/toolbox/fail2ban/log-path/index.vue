@@ -1,6 +1,12 @@
 <template>
     <div>
-        <el-drawer v-model="drawerVisible" :destroy-on-close="true" :close-on-click-modal="false" size="30%">
+        <el-drawer
+            v-model="drawerVisible"
+            :destroy-on-close="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            size="30%"
+        >
             <template #header>
                 <DrawerHeader :header="$t('toolbox.fail2ban.logPath')" :back="handleClose" />
             </template>
@@ -78,7 +84,7 @@ const onSave = async (formEl: FormInstance | undefined) => {
                 type: 'info',
             },
         ).then(async () => {
-            await updateFail2ban({ key: 'logPath', value: form.logPath })
+            await updateFail2ban({ key: 'logpath', value: form.logPath })
                 .then(async () => {
                     MsgSuccess(i18n.global.t('commons.msg.operationSuccess'));
                     loading.value = false;

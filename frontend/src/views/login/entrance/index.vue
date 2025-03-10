@@ -1,39 +1,30 @@
 <template>
     <div>
-        <div v-if="!loading">
-            <div class="login-background" v-if="errStatus === ''">
-                <div class="login-wrapper">
-                    <div :class="screenWidth > 1110 ? 'left inline-block' : ''">
-                        <div class="login-title">
-                            <span>{{ globalStore.themeConfig.title || $t('setting.description') }}</span>
+        <div v-if="init">
+            <div v-if="errStatus === ''">
+                <div class="login-background">
+                    <div class="login-wrapper">
+                        <div :class="screenWidth > 1110 ? 'left inline-block' : ''">
+                            <div class="login-title">
+                                <span>{{ globalStore.themeConfig.title || $t('setting.description') }}</span>
+                            </div>
+                            <img src="@/assets/images/1panel-login.png" alt="" v-if="screenWidth > 1110" />
                         </div>
-                        <img src="@/assets/images/1panel-login.png" alt="" v-if="screenWidth > 1110" />
-                    </div>
-                    <div :class="screenWidth > 1110 ? 'right inline-block' : ''">
-                        <div class="login-container">
-                            <LoginForm ref="loginRef"></LoginForm>
+                        <div :class="screenWidth > 1110 ? 'right inline-block' : ''">
+                            <div class="login-container">
+                                <LoginForm ref="loginRef"></LoginForm>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div v-else>
-                <div v-if="!pageCode || pageCode === '200'">
-                    <div v-if="errStatus === 'err-unsafe'">
-                        <UnSafe />
-                    </div>
-                    <div v-if="errStatus === 'err-ip'">
-                        <ErrIP />
-                    </div>
-                    <div v-if="errStatus === 'err-domain'">
-                        <ErrDomain />
-                    </div>
-                    <div v-if="errStatus === 'not-found'">
-                        <ErrFound />
-                    </div>
+                <div v-if="errStatus.indexOf('code-') !== -1">
+                    <ErrCode :code="errStatus.replaceAll('code-', '')" />
                 </div>
-                <div v-else>
-                    <ErrCode :code="pageCode" />
+                <div v-if="errStatus === 'err-found'">
+                    <ErrFound />
                 </div>
             </div>
         </div>
@@ -41,22 +32,17 @@
 </template>
 
 <script setup lang="ts" name="login">
-import { checkIsSafety, getResponsePage } from '@/api/modules/auth';
 import LoginForm from '../components/login-form.vue';
-import UnSafe from '@/components/error-message/unsafe.vue';
-import ErrIP from '@/components/error-message/err_ip.vue';
 import ErrCode from '@/components/error-message/error_code.vue';
-import ErrDomain from '@/components/error-message/err_domain.vue';
 import ErrFound from '@/components/error-message/404.vue';
 import { ref, onMounted } from 'vue';
 import { GlobalStore } from '@/store';
-import { initFavicon, resetXSetting } from '@/utils/xpack';
+import { getXpackSettingForTheme } from '@/utils/xpack';
 const globalStore = GlobalStore();
 
 const screenWidth = ref(null);
-const errStatus = ref();
-const pageCode = ref('');
-const loading = ref();
+const errStatus = ref('x');
+const init = ref(false);
 
 const mySafetyCode = defineProps({
     code: {
@@ -67,80 +53,18 @@ const mySafetyCode = defineProps({
 
 const getStatus = async () => {
     let code = mySafetyCode.code;
-    loading.value = true;
-    await getResponsePage()
-        .then(async (res) => {
-            pageCode.value = res.data;
-            if (code === 'err-ip' || code === 'err-domain') {
-                errStatus.value = code;
-                loading.value = false;
-                return;
-            }
-            await checkIsSafety(code)
-                .then((safeRes) => {
-                    if (safeRes.data === 'unpass') {
-                        loading.value = false;
-                        errStatus.value = 'err-unsafe';
-                        return;
-                    }
-                    if (safeRes.data === 'disable') {
-                        if (code !== '') {
-                            errStatus.value = 'not-found';
-                            loading.value = false;
-                            return;
-                        }
-                    }
-                    globalStore.entrance = code;
-                    errStatus.value = '';
-                    loadDataFromXDB();
-                })
-                .catch((errRes) => {
-                    pageCode.value = pageCode.value || '200';
-                    loading.value = false;
-                    if (errRes?.code === 408) {
-                        errStatus.value = 'err-ip';
-                        return;
-                    }
-                    if (errRes?.code === 409) {
-                        errStatus.value = 'err-domain';
-                        return;
-                    }
-                    errStatus.value = 'err-unsafe';
-                });
-        })
-        .catch(() => {
-            pageCode.value = '200';
-            errStatus.value = 'err-found';
-            loading.value = false;
-        });
-};
-
-const loadDataFromXDB = async () => {
-    const xpackModules = import.meta.globEager('../../../xpack/api/modules/*.ts');
-    if (xpackModules['../../../xpack/api/modules/setting.ts']) {
-        const searchXSetting = xpackModules['../../../xpack/api/modules/setting.ts'].searchXSetting;
-        if (searchXSetting) {
-            await searchXSetting()
-                .then((res) => {
-                    globalStore.themeConfig.title = res.data.title;
-                    globalStore.themeConfig.logo = res.data.logo;
-                    globalStore.themeConfig.logoWithText = res.data.logoWithText;
-                    globalStore.themeConfig.favicon = res.data.favicon;
-                })
-                .catch(() => {
-                    loading.value = false;
-                    resetXSetting();
-                });
-        } else {
-            loading.value = false;
-            resetXSetting();
-        }
-    } else {
-        loading.value = false;
-        resetXSetting();
+    if (code != '') {
+        globalStore.entrance = code;
     }
-    loading.value = false;
-    initFavicon();
+    await getXpackSettingForTheme();
+    let info = globalStore.errStatus;
+    if (info?.startsWith('err-') || info?.startsWith('code-')) {
+        errStatus.value = info;
+        init.value = true;
+        return;
+    }
+    errStatus.value = '';
+    init.value = true;
 };
 
 onMounted(() => {
@@ -204,7 +128,7 @@ onMounted(() => {
         text-align: right;
         margin-right: 10%;
         span:first-child {
-            color: $primary-color;
+            color: #005eeb;
             font-size: 40px;
             font-family: pingFangSC-Regular;
             font-weight: 600;

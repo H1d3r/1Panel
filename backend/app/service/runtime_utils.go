@@ -2,7 +2,16 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/1Panel-dev/1Panel/backend/app/dto/request"
 	"github.com/1Panel-dev/1Panel/backend/app/model"
 	"github.com/1Panel-dev/1Panel/backend/buserr"
@@ -13,17 +22,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/subosito/gotenv"
 	"gopkg.in/yaml.v3"
-	"io"
-	"net/http"
-	"os"
-	"os/exec"
-	"path"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
-func handleNode(create request.RuntimeCreate, runtime *model.Runtime, fileOp files.FileOp, appVersionDir string) (err error) {
+func handleNodeAndJava(create request.RuntimeCreate, runtime *model.Runtime, fileOp files.FileOp, appVersionDir string) (err error) {
 	runtimeDir := path.Join(constant.RuntimeDir, create.Type)
 	if err = fileOp.CopyDir(appVersionDir, runtimeDir); err != nil {
 		return
@@ -53,7 +54,7 @@ func handleNode(create request.RuntimeCreate, runtime *model.Runtime, fileOp fil
 	}
 
 	go func() {
-		_, _ = http.Get(nodeDetail.DownloadCallBackUrl)
+		RequestDownloadCallBack(nodeDetail.DownloadCallBackUrl)
 	}()
 	go startRuntime(runtime)
 
@@ -144,6 +145,7 @@ func runComposeCmdWithLog(operate string, composePath string, logPath string) er
 		global.LOG.Errorf("Failed to open log file: %v", err)
 		return err
 	}
+	defer logFile.Close()
 	multiWriterStdout := io.MultiWriter(os.Stdout, logFile)
 	cmd.Stdout = multiWriterStdout
 	var stderrBuf bytes.Buffer
@@ -172,6 +174,7 @@ func SyncRuntimeContainerStatus(runtime *model.Runtime) error {
 	if err != nil {
 		return err
 	}
+	defer cli.Close()
 	containers, err := cli.ListContainersByName(containerNames)
 	if err != nil {
 		return err
@@ -211,7 +214,10 @@ func buildRuntime(runtime *model.Runtime, oldImageID string, rebuild bool) {
 		_ = logFile.Close()
 	}()
 
-	cmd := exec.Command("docker-compose", "-f", composePath, "build")
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "docker-compose", "-f", composePath, "build")
 	multiWriterStdout := io.MultiWriter(os.Stdout, logFile)
 	cmd.Stdout = multiWriterStdout
 	var stderrBuf bytes.Buffer
@@ -221,13 +227,18 @@ func buildRuntime(runtime *model.Runtime, oldImageID string, rebuild bool) {
 	err = cmd.Run()
 	if err != nil {
 		runtime.Status = constant.RuntimeError
-		runtime.Message = buserr.New(constant.ErrImageBuildErr).Error() + ":" + stderrBuf.String()
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			runtime.Message = buserr.New(constant.ErrImageBuildErr).Error() + ":" + buserr.New("ErrCmdTimeout").Error()
+		} else {
+			runtime.Message = buserr.New(constant.ErrImageBuildErr).Error() + ":" + stderrBuf.String()
+		}
 	} else {
 		runtime.Status = constant.RuntimeNormal
 		runtime.Message = ""
 		if oldImageID != "" {
 			client, err := docker.NewClient()
 			if err == nil {
+				defer client.Close()
 				newImageID, err := client.GetImageIDByName(runtime.Image)
 				if err == nil && newImageID != oldImageID {
 					global.LOG.Infof("delete imageID [%s] ", oldImageID)
@@ -310,7 +321,39 @@ func handleParams(create request.RuntimeCreate, projectDir string) (composeConte
 		}
 		create.Params["CONTAINER_PACKAGE_URL"] = create.Source
 
-		composeContent, err = handleNodeCompose(env, composeContent, create, projectDir)
+		composeContent, err = handleCompose(env, composeContent, create, projectDir)
+		if err != nil {
+			return
+		}
+	case constant.RuntimeJava:
+		create.Params["CODE_DIR"] = create.CodeDir
+		create.Params["JAVA_VERSION"] = create.Version
+		create.Params["PANEL_APP_PORT_HTTP"] = create.Port
+		composeContent, err = handleCompose(env, composeContent, create, projectDir)
+		if err != nil {
+			return
+		}
+	case constant.RuntimeGo:
+		create.Params["CODE_DIR"] = create.CodeDir
+		create.Params["GO_VERSION"] = create.Version
+		create.Params["PANEL_APP_PORT_HTTP"] = create.Port
+		composeContent, err = handleCompose(env, composeContent, create, projectDir)
+		if err != nil {
+			return
+		}
+	case constant.RuntimePython:
+		create.Params["CODE_DIR"] = create.CodeDir
+		create.Params["PYTHON_VERSION"] = create.Version
+		create.Params["PANEL_APP_PORT_HTTP"] = create.Port
+		composeContent, err = handleCompose(env, composeContent, create, projectDir)
+		if err != nil {
+			return
+		}
+	case constant.RuntimeDotNet:
+		create.Params["CODE_DIR"] = create.CodeDir
+		create.Params["DOTNET_VERSION"] = create.Version
+		create.Params["PANEL_APP_PORT_HTTP"] = create.Port
+		composeContent, err = handleCompose(env, composeContent, create, projectDir)
 		if err != nil {
 			return
 		}
@@ -333,7 +376,7 @@ func handleParams(create request.RuntimeCreate, projectDir string) (composeConte
 	return
 }
 
-func handleNodeCompose(env gotenv.Env, composeContent []byte, create request.RuntimeCreate, projectDir string) (composeByte []byte, err error) {
+func handleCompose(env gotenv.Env, composeContent []byte, create request.RuntimeCreate, projectDir string) (composeByte []byte, err error) {
 	existMap := make(map[string]interface{})
 	composeMap := make(map[string]interface{})
 	if err = yaml.Unmarshal(composeContent, &composeMap); err != nil {
@@ -352,7 +395,18 @@ func handleNodeCompose(env gotenv.Env, composeContent []byte, create request.Run
 		_, ok := serviceValue["ports"].([]interface{})
 		if ok {
 			var ports []interface{}
-			ports = append(ports, "${HOST_IP}:${PANEL_APP_PORT_HTTP}:${NODE_APP_PORT}")
+
+			switch create.Type {
+			case constant.RuntimeNode:
+				ports = append(ports, "${HOST_IP}:${PANEL_APP_PORT_HTTP}:${NODE_APP_PORT}")
+			case constant.RuntimeJava:
+				ports = append(ports, "${HOST_IP}:${PANEL_APP_PORT_HTTP}:${JAVA_APP_PORT}")
+			case constant.RuntimeGo:
+				ports = append(ports, "${HOST_IP}:${PANEL_APP_PORT_HTTP}:${GO_APP_PORT}")
+			case constant.RuntimePython, constant.RuntimeDotNet:
+				ports = append(ports, "${HOST_IP}:${PANEL_APP_PORT_HTTP}:${APP_PORT}")
+			}
+
 			for i, port := range create.ExposedPorts {
 				containerPortStr := fmt.Sprintf("CONTAINER_PORT_%d", i)
 				hostPortStr := fmt.Sprintf("HOST_PORT_%d", i)
@@ -390,6 +444,7 @@ func checkContainerName(name string) error {
 	if err != nil {
 		return err
 	}
+	defer dockerCli.Close()
 	names, err := dockerCli.ListContainersByName([]string{name})
 	if err != nil {
 		return err

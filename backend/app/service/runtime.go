@@ -4,6 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/1Panel-dev/1Panel/backend/app/dto"
 	"github.com/1Panel-dev/1Panel/backend/app/dto/request"
 	"github.com/1Panel-dev/1Panel/backend/app/dto/response"
@@ -19,13 +27,6 @@ import (
 	"github.com/1Panel-dev/1Panel/backend/utils/files"
 	"github.com/pkg/errors"
 	"github.com/subosito/gotenv"
-	"os"
-	"path"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type RuntimeService struct {
@@ -43,6 +44,7 @@ type IRuntimeService interface {
 	OperateNodeModules(req request.NodeModuleOperateReq) error
 	SyncForRestart() error
 	SyncRuntimeStatus() error
+	DeleteCheck(installID uint) ([]dto.AppResource, error)
 }
 
 func NewRuntimeService() IRuntimeService {
@@ -54,7 +56,7 @@ func (r *RuntimeService) Create(create request.RuntimeCreate) (*model.Runtime, e
 		opts []repo.DBOption
 	)
 	if create.Name != "" {
-		opts = append(opts, commonRepo.WithLikeName(create.Name))
+		opts = append(opts, commonRepo.WithByName(create.Name))
 	}
 	if create.Type != "" {
 		opts = append(opts, commonRepo.WithByType(create.Type))
@@ -81,7 +83,7 @@ func (r *RuntimeService) Create(create request.RuntimeCreate) (*model.Runtime, e
 		if exist != nil {
 			return nil, buserr.New(constant.ErrImageExist)
 		}
-	case constant.RuntimeNode:
+	case constant.RuntimeNode, constant.RuntimeJava, constant.RuntimeGo, constant.RuntimePython, constant.RuntimeDotNet:
 		if !fileOp.Stat(create.CodeDir) {
 			return nil, buserr.New(constant.ErrPathNotFound)
 		}
@@ -111,7 +113,7 @@ func (r *RuntimeService) Create(create request.RuntimeCreate) (*model.Runtime, e
 	}
 
 	appVersionDir := filepath.Join(app.GetAppResourcePath(), appDetail.Version)
-	if !fileOp.Stat(appVersionDir) || appDetail.Update {
+	if !fileOp.Stat(appVersionDir) {
 		if err = downloadApp(app, appDetail, nil); err != nil {
 			return nil, err
 		}
@@ -131,9 +133,9 @@ func (r *RuntimeService) Create(create request.RuntimeCreate) (*model.Runtime, e
 		if err = handlePHP(create, runtime, fileOp, appVersionDir); err != nil {
 			return nil, err
 		}
-	case constant.RuntimeNode:
+	case constant.RuntimeNode, constant.RuntimeJava, constant.RuntimeGo, constant.RuntimePython, constant.RuntimeDotNet:
 		runtime.Port = create.Port
-		if err = handleNode(create, runtime, fileOp, appVersionDir); err != nil {
+		if err = handleNodeAndJava(create, runtime, fileOp, appVersionDir); err != nil {
 			return nil, err
 		}
 	}
@@ -176,6 +178,18 @@ func (r *RuntimeService) Page(req request.RuntimeSearch) (int64, []response.Runt
 	return total, res, nil
 }
 
+func (r *RuntimeService) DeleteCheck(runTimeId uint) ([]dto.AppResource, error) {
+	var res []dto.AppResource
+	websites, _ := websiteRepo.GetBy(websiteRepo.WithRuntimeID(runTimeId))
+	for _, website := range websites {
+		res = append(res, dto.AppResource{
+			Type: "website",
+			Name: website.PrimaryDomain,
+		})
+	}
+	return res, nil
+}
+
 func (r *RuntimeService) Delete(runtimeDelete request.RuntimeDelete) error {
 	runtime, err := runtimeRepo.GetFirst(commonRepo.WithByID(runtimeDelete.ID))
 	if err != nil {
@@ -193,6 +207,7 @@ func (r *RuntimeService) Delete(runtimeDelete request.RuntimeDelete) error {
 			if err != nil {
 				return err
 			}
+			defer client.Close()
 			imageID, err := client.GetImageIDByName(runtime.Image)
 			if err != nil {
 				return err
@@ -202,7 +217,7 @@ func (r *RuntimeService) Delete(runtimeDelete request.RuntimeDelete) error {
 					global.LOG.Errorf("delete image id [%s] error %v", imageID, err)
 				}
 			}
-		case constant.RuntimeNode:
+		case constant.RuntimeNode, constant.RuntimeJava, constant.RuntimeGo, constant.RuntimePython, constant.RuntimeDotNet:
 			if out, err := compose.Down(runtime.GetComposePath()); err != nil && !runtimeDelete.ForceDelete {
 				if out != "" {
 					return errors.New(out)
@@ -285,7 +300,7 @@ func (r *RuntimeService) Get(id uint) (*response.RuntimeDTO, error) {
 			}
 		}
 		res.AppParams = appParams
-	case constant.RuntimeNode:
+	case constant.RuntimeNode, constant.RuntimeJava, constant.RuntimeGo, constant.RuntimePython, constant.RuntimeDotNet:
 		res.Params = make(map[string]interface{})
 		envs, err := gotenv.Unmarshal(runtime.Env)
 		if err != nil {
@@ -293,7 +308,7 @@ func (r *RuntimeService) Get(id uint) (*response.RuntimeDTO, error) {
 		}
 		for k, v := range envs {
 			switch k {
-			case "NODE_APP_PORT", "PANEL_APP_PORT_HTTP":
+			case "NODE_APP_PORT", "PANEL_APP_PORT_HTTP", "JAVA_APP_PORT", "GO_APP_PORT", "APP_PORT":
 				port, err := strconv.Atoi(v)
 				if err != nil {
 					return nil, err
@@ -346,7 +361,7 @@ func (r *RuntimeService) Update(req request.RuntimeUpdate) error {
 		if exist != nil {
 			return buserr.New(constant.ErrImageExist)
 		}
-	case constant.RuntimeNode:
+	case constant.RuntimeNode, constant.RuntimeJava, constant.RuntimeGo, constant.RuntimePython, constant.RuntimeDotNet:
 		if runtime.Port != req.Port {
 			if err = checkPortExist(req.Port); err != nil {
 				return err
@@ -420,12 +435,13 @@ func (r *RuntimeService) Update(req request.RuntimeUpdate) error {
 		if err != nil {
 			return err
 		}
+		defer client.Close()
 		imageID, err := client.GetImageIDByName(oldImage)
 		if err != nil {
 			return err
 		}
 		go buildRuntime(runtime, imageID, req.Rebuild)
-	case constant.RuntimeNode:
+	case constant.RuntimeNode, constant.RuntimeJava, constant.RuntimeGo, constant.RuntimePython, constant.RuntimeDotNet:
 		runtime.Version = req.Version
 		runtime.CodeDir = req.CodeDir
 		runtime.Port = req.Port
@@ -478,6 +494,9 @@ func (r *RuntimeService) OperateRuntime(req request.RuntimeOperate) error {
 			runtime.Message = err.Error()
 			_ = runtimeRepo.Save(runtime)
 		}
+	}()
+	go func() {
+		_ = docker.CreateDefaultDockerNetwork()
 	}()
 	switch req.Operate {
 	case constant.RuntimeUp:
@@ -594,7 +613,7 @@ func (r *RuntimeService) SyncRuntimeStatus() error {
 		return err
 	}
 	for _, runtime := range runtimes {
-		if runtime.Type == constant.RuntimeNode {
+		if runtime.Type != constant.RuntimePHP {
 			_ = SyncRuntimeContainerStatus(&runtime)
 		}
 	}

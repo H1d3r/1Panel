@@ -3,6 +3,7 @@
         v-model="open"
         :destroy-on-close="true"
         :close-on-click-modal="false"
+        :close-on-press-escape="false"
         :before-close="handleClose"
         size="40%"
     >
@@ -28,6 +29,9 @@
                                 <FileList :path="form.dst" @choose="getLinkPath" :dir="true"></FileList>
                             </template>
                         </el-input>
+                    </el-form-item>
+                    <el-form-item :label="$t('setting.compressPassword')" prop="secret" v-if="name.includes('tar.gz')">
+                        <el-input v-model="form.secret"></el-input>
                     </el-form-item>
                 </el-form>
             </el-col>
@@ -67,7 +71,7 @@ const rules = reactive<FormRules>({
 
 const fileForm = ref<FormInstance>();
 let loading = ref(false);
-let form = ref<File.FileDeCompress>({ type: 'zip', dst: '', path: '' });
+let form = ref<File.FileDeCompress>({ type: 'zip', dst: '', path: '', secret: '' });
 let open = ref(false);
 let name = ref('');
 

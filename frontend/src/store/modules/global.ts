@@ -14,10 +14,10 @@ const GlobalStore = defineStore({
         language: '',
         themeConfig: {
             panelName: '',
-            primary: '#005EEB',
+            primary: '#005eeb',
             theme: 'auto',
             footer: true,
-
+            themeColor: '',
             title: '',
             logo: '',
             logoWithText: '',
@@ -32,13 +32,25 @@ const GlobalStore = defineStore({
         device: DeviceType.Desktop,
         lastFilePath: '',
         currentDB: '',
+        currentRedisDB: '',
         showEntranceWarn: true,
         defaultNetwork: 'all',
 
         isProductPro: false,
+        isIntl: false,
+        isTrial: false,
         productProExpires: 0,
+        licenseVerify: '',
+
+        errStatus: '',
     }),
-    getters: {},
+    getters: {
+        isDarkTheme: (state) =>
+            state.themeConfig.theme === 'dark' ||
+            (state.themeConfig.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches),
+        isDarkGoldTheme: (state) => state.themeConfig.primary === '#F0BE96' && state.isProductPro,
+        docsUrl: (state) => (state.isIntl ? 'https://docs.1panel.pro' : 'https://1panel.cn/docs'),
+    },
     actions: {
         setOpenMenuTabs(openMenuTabs: boolean) {
             this.openMenuTabs = openMenuTabs;
@@ -79,6 +91,9 @@ const GlobalStore = defineStore({
         },
         setCurrentDB(name: string) {
             this.currentDB = name;
+        },
+        setCurrentRedisDB(name: string) {
+            this.currentRedisDB = name;
         },
         setShowEntranceWarn(show: boolean) {
             this.showEntranceWarn = show;

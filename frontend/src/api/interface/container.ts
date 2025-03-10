@@ -9,6 +9,14 @@ export namespace Container {
         name: string;
         newName: string;
     }
+    export interface ContainerCommit {
+        containerID: string;
+        containerName: string;
+        newImageName: string;
+        comment: string;
+        author: string;
+        pause: boolean;
+    }
     export interface ContainerSearch extends ReqPage {
         name: string;
         state: string;
@@ -233,6 +241,8 @@ export namespace Container {
         path: string;
         containers: Array<ComposeContainer>;
         expand: boolean;
+        envStr: string;
+        env: Array<string>;
     }
     export interface ComposeContainer {
         name: string;
@@ -246,6 +256,8 @@ export namespace Container {
         file: string;
         path: string;
         template: number;
+        env: Array<string>;
+        envStr: string;
     }
     export interface ComposeOperation {
         name: string;
@@ -257,6 +269,8 @@ export namespace Container {
         name: string;
         path: string;
         content: string;
+        env: Array<string>;
+        createdBy: string;
     }
 
     export interface TemplateCreate {
@@ -307,5 +321,12 @@ export namespace Container {
 
         logMaxSize: string;
         logMaxFile: string;
+    }
+
+    export interface ContainerLogInfo {
+        container: string;
+        since: string;
+        tail: number;
+        containerType: string;
     }
 }

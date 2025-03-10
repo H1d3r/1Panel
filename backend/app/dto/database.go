@@ -27,8 +27,8 @@ type MysqlDBSearch struct {
 	PageInfo
 	Info     string `json:"info"`
 	Database string `json:"database" validate:"required"`
-	OrderBy  string `json:"orderBy"`
-	Order    string `json:"order"`
+	OrderBy  string `json:"orderBy" validate:"required,oneof=name created_at"`
+	Order    string `json:"order" validate:"required,oneof=null ascending descending"`
 }
 
 type MysqlDBInfo struct {
@@ -131,7 +131,7 @@ type MysqlStatus struct {
 }
 
 type MysqlVariables struct {
-	BinlogCacheSize       string `json:"binlog_cache_size"`
+	BinlogCacheSize      string `json:"binlog_cache_size"`
 	InnodbBufferPoolSize string `json:"innodb_buffer_pool_size"`
 	InnodbLogBufferSize  string `json:"innodb_log_buffer_size"`
 	JoinBufferSize       string `json:"join_buffer_size"`
@@ -139,7 +139,7 @@ type MysqlVariables struct {
 	MaxConnections       string `json:"max_connections"`
 	MaxHeapTableSize     string `json:"max_heap_table_size"`
 	QueryCacheSize       string `json:"query_cache_size"`
-	QueryCache_type      string `json:"query_cache_type"`
+	QueryCacheType       string `json:"query_cache_type"`
 	ReadBufferSize       string `json:"read_buffer_size"`
 	ReadRndBufferSize    string `json:"read_rnd_buffer_size"`
 	SortBufferSize       string `json:"sort_buffer_size"`
@@ -165,26 +165,26 @@ type MysqlVariablesUpdateHelper struct {
 
 // redis
 type ChangeRedisPass struct {
-	Value string `json:"value" validate:"required"`
+	Database string `json:"database" validate:"required"`
+	Value    string `json:"value"`
 }
 
 type RedisConfUpdate struct {
+	Database   string `json:"database" validate:"required"`
 	Timeout    string `json:"timeout"`
 	Maxclients string `json:"maxclients"`
 	Maxmemory  string `json:"maxmemory"`
 }
 type RedisConfPersistenceUpdate struct {
+	Database    string `json:"database" validate:"required"`
 	Type        string `json:"type" validate:"required,oneof=aof rbd"`
 	Appendonly  string `json:"appendonly"`
 	Appendfsync string `json:"appendfsync"`
 	Save        string `json:"save"`
 }
-type RedisConfUpdateByFile struct {
-	File       string `json:"file" validate:"required"`
-	RestartNow bool   `json:"restartNow"`
-}
 
 type RedisConf struct {
+	Database      string `json:"database" validate:"required"`
 	Name          string `json:"name"`
 	Port          int64  `json:"port"`
 	ContainerName string `json:"containerName"`
@@ -195,18 +195,20 @@ type RedisConf struct {
 }
 
 type RedisPersistence struct {
+	Database    string `json:"database" validate:"required"`
 	Appendonly  string `json:"appendonly"`
 	Appendfsync string `json:"appendfsync"`
 	Save        string `json:"save"`
 }
 
 type RedisStatus struct {
+	Database                 string `json:"database" validate:"required"`
 	TcpPort                  string `json:"tcp_port"`
 	UptimeInDays             string `json:"uptime_in_days"`
 	ConnectedClients         string `json:"connected_clients"`
 	UsedMemory               string `json:"used_memory"`
-	UsedMemory_rss           string `json:"used_memory_rss"`
-	UsedMemory_peak          string `json:"used_memory_peak"`
+	UsedMemoryRss            string `json:"used_memory_rss"`
+	UsedMemoryPeak           string `json:"used_memory_peak"`
 	MemFragmentationRatio    string `json:"mem_fragmentation_ratio"`
 	TotalConnectionsReceived string `json:"total_connections_received"`
 	TotalCommandsProcessed   string `json:"total_commands_processed"`
@@ -217,12 +219,14 @@ type RedisStatus struct {
 }
 
 type DatabaseFileRecords struct {
+	Database  string `json:"database" validate:"required"`
 	FileName  string `json:"fileName"`
 	FileDir   string `json:"fileDir"`
 	CreatedAt string `json:"createdAt"`
 	Size      int    `json:"size"`
 }
 type RedisBackupRecover struct {
+	Database string `json:"database" validate:"required"`
 	FileName string `json:"fileName"`
 	FileDir  string `json:"fileDir"`
 }
@@ -232,8 +236,8 @@ type DatabaseSearch struct {
 	PageInfo
 	Info    string `json:"info"`
 	Type    string `json:"type"`
-	OrderBy string `json:"orderBy"`
-	Order   string `json:"order"`
+	OrderBy string `json:"orderBy" validate:"required,oneof=name created_at"`
+	Order   string `json:"order" validate:"required,oneof=null ascending descending"`
 }
 
 type DatabaseInfo struct {
@@ -281,7 +285,7 @@ type DatabaseCreate struct {
 	Address  string `json:"address"`
 	Port     uint   `json:"port"`
 	Username string `json:"username" validate:"required"`
-	Password string `json:"password" validate:"required"`
+	Password string `json:"password"`
 
 	SSL        bool   `json:"ssl"`
 	RootCert   string `json:"rootCert"`
@@ -299,7 +303,7 @@ type DatabaseUpdate struct {
 	Address  string `json:"address"`
 	Port     uint   `json:"port"`
 	Username string `json:"username" validate:"required"`
-	Password string `json:"password" validate:"required"`
+	Password string `json:"password"`
 
 	SSL        bool   `json:"ssl"`
 	RootCert   string `json:"rootCert"`

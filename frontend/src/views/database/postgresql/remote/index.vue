@@ -2,19 +2,19 @@
     <div v-loading="loading">
         <LayoutContent>
             <template #title>
-                <back-button name="PostgreSQL" :header="$t('database.remoteDB')" />
+                <back-button name="PostgreSQL" :header="$t('database.remoteDB', 2)" />
             </template>
             <template #toolbar>
-                <el-row>
-                    <el-col :xs="24" :sm="20" :md="20" :lg="20" :xl="20">
+                <div class="flex justify-between gap-2 flex-wrap sm:flex-row">
+                    <div class="flex flex-wrap gap-3">
                         <el-button type="primary" @click="onOpenDialog('create')">
                             {{ $t('database.createRemoteDB') }}
                         </el-button>
-                    </el-col>
-                    <el-col :xs="24" :sm="4" :md="4" :lg="4" :xl="4">
+                    </div>
+                    <div class="flex flex-wrap gap-3">
                         <TableSearch @search="search()" v-model:searchName="searchName" />
-                    </el-col>
-                </el-row>
+                    </div>
+                </div>
             </template>
             <template #main>
                 <ComplexTable :pagination-config="paginationConfig" @sort-change="search" @search="search" :data="data">
@@ -23,7 +23,7 @@
                     <el-table-column :label="$t('commons.login.username')" prop="username" />
                     <el-table-column :label="$t('commons.login.password')" prop="password">
                         <template #default="{ row }">
-                            <div class="flex items-center">
+                            <div class="flex items-center flex-wrap">
                                 <div class="star-center">
                                     <span v-if="!row.showPassword">**********</span>
                                 </div>
@@ -128,7 +128,7 @@ const onOpenDialog = async (
     rowData: Partial<Database.DatabaseInfo> = {
         name: '',
         type: 'postgresql',
-        version: '16.x',
+        version: '17.x',
         address: '',
         port: 5432,
         username: '',
@@ -163,7 +163,7 @@ const buttons = [
         },
     },
     {
-        label: i18n.global.t('commons.button.delete'),
+        label: i18n.global.t('commons.button.unbind'),
         click: (row: Database.DatabaseInfo) => {
             onDelete(row);
         },

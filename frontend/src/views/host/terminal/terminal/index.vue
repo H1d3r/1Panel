@@ -3,7 +3,7 @@
         <el-tabs
             type="card"
             class="terminal-tabs"
-            style="background-color: #efefef; margin-top: 20px"
+            style="background-color: var(--panel-terminal-tag-bg-color); margin-top: 20px"
             v-model="terminalValue"
             :before-leave="beforeLeave"
             @tab-change="quickCmd = ''"
@@ -44,12 +44,15 @@
                     </span>
                 </template>
                 <Terminal
-                    :style="{ height: `calc(100vh - ${loadHeight()})`, 'background-color': '#000' }"
+                    :style="{
+                        height: `calc(100vh - ${loadHeight()})`,
+                        'background-color': `var(--panel-logs-bg-color)`,
+                    }"
                     :ref="'t-' + item.index"
                     :key="item.Refresh"
                 ></Terminal>
-                <div>
-                    <el-select v-model="quickCmd" clearable filterable @change="quickInput" style="width: 25%">
+                <div class="flex w-full flex-col md:flex-row">
+                    <el-select v-model="quickCmd" clearable filterable @change="quickInput">
                         <template #prefix>{{ $t('terminal.quickCommand') }}</template>
                         <el-option-group v-for="group in commandTree" :key="group.label" :label="group.label">
                             <el-option
@@ -60,7 +63,7 @@
                             />
                         </el-option-group>
                     </el-select>
-                    <el-input v-model="batchVal" @keyup.enter="batchInput" style="width: 75%">
+                    <el-input v-model="batchVal" @keyup.enter="batchInput">
                         <template #prepend>
                             <el-checkbox :label="$t('terminal.batchInput')" v-model="isBatch" />
                         </template>
@@ -105,7 +108,7 @@
                                         <span v-if="node.label.length <= 25">
                                             <a @click="onClickConn(node, data)">{{ node.label }}</a>
                                         </span>
-                                        <el-tooltip v-else :content="node.label" placement="top-start">
+                                        <el-tooltip v-else :content="node.label" placement="right">
                                             <span>
                                                 <a @click="onClickConn(node, data)">
                                                     {{ node.label.substring(0, 22) }}...
@@ -383,7 +386,7 @@ const onConnTerminal = async (title: string, wsID: number, isLocal?: boolean) =>
                 endpoint: '/api/v1/terminals',
                 args: `id=${wsID}`,
                 initCmd: initCmd.value,
-                error: res.data ? '' : 'Authentication failed.  Please check the host information !',
+                error: res.data ? '' : 'Authentication failed. Please check the host information!',
             });
         initCmd.value = '';
     });
@@ -407,7 +410,7 @@ defineExpose({
 onMounted(() => {
     if (router.currentRoute.value.query.path) {
         const path = String(router.currentRoute.value.query.path);
-        initCmd.value = `cd ${path} \n`;
+        initCmd.value = `cd "${path}" \n`;
     }
 });
 </script>
@@ -427,12 +430,17 @@ onMounted(() => {
         z-index: calc(var(--el-index-normal) + 1);
     }
     :deep(.el-tabs__item) {
-        color: #575758;
-        padding: 0 0px;
+        padding: 0;
     }
     :deep(.el-tabs__item.is-active) {
-        color: #ebeef5;
-        background-color: #575758;
+        color: var(--panel-terminal-tag-active-text-color);
+        background-color: var(--panel-terminal-tag-active-bg-color);
+    }
+    :deep(.el-tabs__item:hover) {
+        color: var(--panel-terminal-tag-hover-text-color);
+    }
+    :deep(.el-tabs__item.is-active:hover) {
+        color: var(--panel-terminal-tag-active-text-color);
     }
 }
 
@@ -448,7 +456,7 @@ onMounted(() => {
     font-weight: 600;
 }
 .fullScreen {
-    background-color: #efefef;
+    background-color: transparent;
     border: none;
     position: absolute;
     right: 50px;

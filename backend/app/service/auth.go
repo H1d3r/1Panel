@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto/hmac"
+	"encoding/base64"
 	"strconv"
 
 	"github.com/1Panel-dev/1Panel/backend/app/dto"
@@ -19,12 +20,13 @@ import (
 type AuthService struct{}
 
 type IAuthService interface {
-	CheckIsSafety(code string) (string, error)
 	GetResponsePage() (string, error)
 	VerifyCode(code string) (bool, error)
 	Login(c *gin.Context, info dto.Login, entrance string) (*dto.UserLoginInfo, error)
 	LogOut(c *gin.Context) error
 	MFALogin(c *gin.Context, info dto.MFALogin, entrance string) (*dto.UserLoginInfo, error)
+	GetSecurityEntrance() string
+	IsLogin(c *gin.Context) bool
 }
 
 func NewIAuthService() IAuthService {
@@ -36,16 +38,11 @@ func (u *AuthService) Login(c *gin.Context, info dto.Login, entrance string) (*d
 	if err != nil {
 		return nil, errors.WithMessage(constant.ErrRecordNotFound, err.Error())
 	}
-	passwordSetting, err := settingRepo.Get(settingRepo.WithByKey("Password"))
-	if err != nil {
-		return nil, errors.WithMessage(constant.ErrRecordNotFound, err.Error())
-	}
-	pass, err := encrypt.StringDecrypt(passwordSetting.Value)
-	if err != nil {
+	if nameSetting.Value != info.Name {
 		return nil, constant.ErrAuth
 	}
-	if !hmac.Equal([]byte(info.Password), []byte(pass)) || nameSetting.Value != info.Name {
-		return nil, constant.ErrAuth
+	if err = checkPassword(info.Password); err != nil {
+		return nil, err
 	}
 	entranceSetting, err := settingRepo.Get(settingRepo.WithByKey("SecurityEntrance"))
 	if err != nil {
@@ -64,7 +61,16 @@ func (u *AuthService) Login(c *gin.Context, info dto.Login, entrance string) (*d
 	if mfa.Value == "enable" {
 		return &dto.UserLoginInfo{Name: nameSetting.Value, MfaStatus: mfa.Value}, nil
 	}
-	return u.generateSession(c, info.Name, info.AuthMethod)
+
+	loginUser, err := u.generateSession(c, info.Name, info.AuthMethod)
+	if err != nil {
+		return nil, err
+	}
+	if entrance != "" {
+		entranceValue := base64.StdEncoding.EncodeToString([]byte(entrance))
+		c.SetCookie("SecurityEntrance", entranceValue, 0, "", "", false, true)
+	}
+	return loginUser, nil
 }
 
 func (u *AuthService) MFALogin(c *gin.Context, info dto.MFALogin, entrance string) (*dto.UserLoginInfo, error) {
@@ -72,16 +78,11 @@ func (u *AuthService) MFALogin(c *gin.Context, info dto.MFALogin, entrance strin
 	if err != nil {
 		return nil, errors.WithMessage(constant.ErrRecordNotFound, err.Error())
 	}
-	passwordSetting, err := settingRepo.Get(settingRepo.WithByKey("Password"))
-	if err != nil {
-		return nil, errors.WithMessage(constant.ErrRecordNotFound, err.Error())
-	}
-	pass, err := encrypt.StringDecrypt(passwordSetting.Value)
-	if err != nil {
-		return nil, err
-	}
-	if !hmac.Equal([]byte(info.Password), []byte(pass)) || nameSetting.Value != info.Name {
+	if nameSetting.Value != info.Name {
 		return nil, constant.ErrAuth
+	}
+	if err = checkPassword(info.Password); err != nil {
+		return nil, err
 	}
 	entranceSetting, err := settingRepo.Get(settingRepo.WithByKey("SecurityEntrance"))
 	if err != nil {
@@ -103,7 +104,15 @@ func (u *AuthService) MFALogin(c *gin.Context, info dto.MFALogin, entrance strin
 		return nil, constant.ErrAuth
 	}
 
-	return u.generateSession(c, info.Name, info.AuthMethod)
+	loginUser, err := u.generateSession(c, info.Name, info.AuthMethod)
+	if err != nil {
+		return nil, err
+	}
+	if entrance != "" {
+		entranceValue := base64.StdEncoding.EncodeToString([]byte(entrance))
+		c.SetCookie("SecurityEntrance", entranceValue, 0, "", "", false, true)
+	}
+	return loginUser, nil
 }
 
 func (u *AuthService) generateSession(c *gin.Context, name, authMethod string) (*dto.UserLoginInfo, error) {
@@ -173,24 +182,52 @@ func (u *AuthService) VerifyCode(code string) (bool, error) {
 	return hmac.Equal([]byte(setting.Value), []byte(code)), nil
 }
 
-func (u *AuthService) CheckIsSafety(code string) (string, error) {
-	status, err := settingRepo.Get(settingRepo.WithByKey("SecurityEntrance"))
-	if err != nil {
-		return "", err
-	}
-	if len(status.Value) == 0 {
-		return "disable", nil
-	}
-	if status.Value == code {
-		return "pass", nil
-	}
-	return "unpass", nil
-}
-
 func (u *AuthService) GetResponsePage() (string, error) {
 	pageCode, err := settingRepo.Get(settingRepo.WithByKey("NoAuthSetting"))
 	if err != nil {
 		return "", err
 	}
 	return pageCode.Value, nil
+}
+
+func (u *AuthService) GetSecurityEntrance() string {
+	status, err := settingRepo.Get(settingRepo.WithByKey("SecurityEntrance"))
+	if err != nil {
+		return ""
+	}
+	if len(status.Value) == 0 {
+		return ""
+	}
+	return status.Value
+}
+
+func (u *AuthService) IsLogin(c *gin.Context) bool {
+	sID, _ := c.Cookie(constant.SessionName)
+	_, err := global.SESSION.Get(sID)
+	return err == nil
+}
+
+func checkPassword(password string) error {
+	priKey, _ := settingRepo.Get(settingRepo.WithByKey("PASSWORD_PRIVATE_KEY"))
+
+	privateKey, err := encrypt.ParseRSAPrivateKey(priKey.Value)
+	if err != nil {
+		return err
+	}
+	loginPassword, err := encrypt.DecryptPassword(password, privateKey)
+	if err != nil {
+		return err
+	}
+	passwordSetting, err := settingRepo.Get(settingRepo.WithByKey("Password"))
+	if err != nil {
+		return errors.WithMessage(constant.ErrRecordNotFound, err.Error())
+	}
+	existPassword, err := encrypt.StringDecrypt(passwordSetting.Value)
+	if err != nil {
+		return err
+	}
+	if !hmac.Equal([]byte(loginPassword), []byte(existPassword)) {
+		return constant.ErrAuth
+	}
+	return nil
 }

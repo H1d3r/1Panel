@@ -53,6 +53,10 @@ export const CheckFile = (path: string) => {
     return http.post<boolean>('files/check', { path: path });
 };
 
+export const BatchCheckFiles = (paths: string[]) => {
+    return http.post<File.ExistFileInfo[]>('files/batch/check', { paths: paths }, TimeoutEnum.T_5M);
+};
+
 export const UploadFileData = (params: FormData, config: AxiosRequestConfig) => {
     return http.upload<File.File>('files/upload', params, config);
 };
@@ -74,7 +78,7 @@ export const WgetFile = (params: File.FileWget) => {
 };
 
 export const MoveFile = (params: File.FileMove) => {
-    return http.post<File.File>('files/move', params);
+    return http.post<File.File>('files/move', params, TimeoutEnum.T_5M);
 };
 
 export const DownloadFile = (params: File.FileDownload) => {
@@ -82,7 +86,7 @@ export const DownloadFile = (params: File.FileDownload) => {
 };
 
 export const ComputeDirSize = (params: File.DirSizeReq) => {
-    return http.post<File.DirSizeRes>('files/size', params);
+    return http.post<File.DirSizeRes>('files/size', params, TimeoutEnum.T_5M);
 };
 
 export const FileKeys = () => {

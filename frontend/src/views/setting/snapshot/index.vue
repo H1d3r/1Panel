@@ -1,9 +1,9 @@
 <template>
     <div>
-        <LayoutContent v-loading="loading" v-if="!isRecordShow" :title="$t('setting.snapshot')">
+        <LayoutContent v-loading="loading" v-if="!isRecordShow" :title="$t('setting.snapshot', 2)">
             <template #toolbar>
-                <el-row>
-                    <el-col :xs="24" :sm="16" :md="16" :lg="16" :xl="16">
+                <div class="flex justify-between gap-2 flex-wrap sm:flex-row">
+                    <div class="flex flex-wrap gap-3">
                         <el-button type="primary" @click="onCreate()">
                             {{ $t('setting.createSnapshot') }}
                         </el-button>
@@ -11,23 +11,24 @@
                             {{ $t('setting.importSnapshot') }}
                         </el-button>
                         <el-button type="primary" plain @click="onIgnore()">
-                            {{ $t('setting.ignoreRule') }}
+                            {{ $t('setting.editIgnoreRule') }}
                         </el-button>
                         <el-button type="primary" plain :disabled="selects.length === 0" @click="batchDelete(null)">
                             {{ $t('commons.button.delete') }}
                         </el-button>
-                    </el-col>
-                    <el-col :xs="24" :sm="8" :md="8" :lg="8" :xl="8">
+                    </div>
+                    <div class="flex flex-wrap gap-3">
                         <TableSetting ref="timerRef" @search="search()" />
                         <TableSearch @search="search()" v-model:searchName="searchName" />
-                    </el-col>
-                </el-row>
+                    </div>
+                </div>
             </template>
             <template #main>
                 <ComplexTable
                     :pagination-config="paginationConfig"
                     v-model:selects="selects"
                     :data="data"
+                    @sort-change="search"
                     style="margin-top: 20px"
                     @search="search"
                 >
@@ -37,6 +38,7 @@
                         :label="$t('commons.table.name')"
                         min-width="100"
                         prop="name"
+                        sortable
                         fix
                     />
                     <el-table-column prop="version" :label="$t('app.version')" />
@@ -71,6 +73,19 @@
                             </div>
                         </template>
                     </el-table-column>
+                    <el-table-column :label="$t('file.size')" prop="size" min-width="60" show-overflow-tooltip>
+                        <template #default="{ row }">
+                            <div v-if="row.hasLoad">
+                                <span v-if="row.size">
+                                    {{ computeSize(row.size) }}
+                                </span>
+                                <span v-else>-</span>
+                            </div>
+                            <div v-if="!row.hasLoad">
+                                <el-button link loading></el-button>
+                            </div>
+                        </template>
+                    </el-table-column>
                     <el-table-column :label="$t('commons.table.status')" min-width="80" prop="status">
                         <template #default="{ row }">
                             <el-button
@@ -89,13 +104,14 @@
                             </el-tag>
                         </template>
                     </el-table-column>
-                    <el-table-column :label="$t('commons.table.description')" prop="description">
+                    <el-table-column :label="$t('commons.table.description')" prop="description" show-overflow-tooltip>
                         <template #default="{ row }">
                             <fu-input-rw-switch v-model="row.description" @blur="onChange(row)" />
                         </template>
                     </el-table-column>
                     <el-table-column
-                        prop="createdAt"
+                        prop="created_at"
+                        sortable
                         :label="$t('commons.table.date')"
                         :formatter="dateFormat"
                         show-overflow-tooltip
@@ -112,7 +128,7 @@
         </LayoutContent>
         <RecoverStatus ref="recoverStatusRef" @search="search()"></RecoverStatus>
         <SnapshotImport ref="importRef" @search="search()" />
-        <el-drawer v-model="drawerVisible" size="50%">
+        <el-drawer v-model="drawerVisible" size="50%" :close-on-click-modal="false" :close-on-press-escape="false">
             <template #header>
                 <DrawerHeader :header="$t('setting.createSnapshot')" :back="handleClose" />
             </template>
@@ -146,6 +162,9 @@
                                 />
                             </el-select>
                         </el-form-item>
+                        <el-form-item :label="$t('setting.compressPassword')" prop="secret">
+                            <el-input v-model="snapInfo.secret"></el-input>
+                        </el-form-item>
                         <el-form-item :label="$t('commons.table.description')" prop="description">
                             <el-input type="textarea" clearable v-model="snapInfo.description" />
                         </el-form-item>
@@ -164,7 +183,18 @@
             </template>
         </el-drawer>
 
-        <OpDialog ref="opRef" @search="search" />
+        <OpDialog ref="opRef" @search="search" @submit="onSubmitDelete()">
+            <template #content>
+                <el-form class="mt-4 mb-1" ref="deleteForm" label-position="left">
+                    <el-form-item>
+                        <el-checkbox v-model="cleanData" :label="$t('cronjob.cleanData')" />
+                        <span class="input-help">
+                            {{ $t('setting.deleteHelper') }}
+                        </span>
+                    </el-form-item>
+                </el-form>
+            </template>
+        </OpDialog>
         <SnapStatus ref="snapStatusRef" @search="search" />
         <IgnoreRule ref="ignoreRef" />
     </div>
@@ -172,9 +202,15 @@
 
 <script setup lang="ts">
 import DrawerHeader from '@/components/drawer-header/index.vue';
-import { snapshotCreate, searchSnapshotPage, snapshotDelete, updateSnapshotDescription } from '@/api/modules/setting';
+import {
+    snapshotCreate,
+    searchSnapshotPage,
+    snapshotDelete,
+    updateSnapshotDescription,
+    loadSnapshotSize,
+} from '@/api/modules/setting';
 import { onMounted, reactive, ref } from 'vue';
-import { dateFormat } from '@/utils/util';
+import { computeSize, dateFormat } from '@/utils/util';
 import { ElForm } from 'element-plus';
 import { Rules } from '@/global/form-rules';
 import i18n from '@/lang';
@@ -194,6 +230,8 @@ const paginationConfig = reactive({
     currentPage: 1,
     pageSize: 10,
     total: 0,
+    orderBy: 'created_at',
+    order: 'null',
 });
 const searchName = ref();
 
@@ -206,6 +244,8 @@ const importRef = ref();
 const isRecordShow = ref();
 const backupOptions = ref();
 const accountOptions = ref();
+
+const operateIDs = ref();
 
 type FormInstance = InstanceType<typeof ElForm>;
 const snapRef = ref<FormInstance>();
@@ -220,7 +260,9 @@ let snapInfo = reactive<Setting.SnapshotCreate>({
     defaultDownload: '',
     fromAccounts: [],
     description: '',
+    secret: '',
 });
+const cleanData = ref();
 
 const drawerVisible = ref<boolean>(false);
 
@@ -324,6 +366,7 @@ const batchDelete = async (row: Setting.SnapshotInfo | null) => {
             names.push(item.name);
         });
     }
+    operateIDs.value = ids;
     opRef.value.acceptParams({
         title: i18n.global.t('commons.button.delete'),
         names: names,
@@ -331,9 +374,22 @@ const batchDelete = async (row: Setting.SnapshotInfo | null) => {
             i18n.global.t('setting.snapshot'),
             i18n.global.t('commons.button.delete'),
         ]),
-        api: snapshotDelete,
-        params: { ids: ids },
+        api: null,
+        params: null,
     });
+};
+
+const onSubmitDelete = async () => {
+    loading.value = true;
+    await snapshotDelete({ ids: operateIDs.value, deleteWithFile: cleanData.value })
+        .then(() => {
+            loading.value = false;
+            MsgSuccess(i18n.global.t('commons.msg.deleteSuccess'));
+            search();
+        })
+        .catch(() => {
+            loading.value = false;
+        });
 };
 
 function restForm() {
@@ -359,15 +415,50 @@ const buttons = [
     },
 ];
 
-const search = async () => {
+const search = async (column?: any) => {
+    paginationConfig.orderBy = column?.order ? column.prop : paginationConfig.orderBy;
+    paginationConfig.order = column?.order ? column.order : paginationConfig.order;
     let params = {
         info: searchName.value,
         page: paginationConfig.currentPage,
         pageSize: paginationConfig.pageSize,
+        orderBy: paginationConfig.orderBy,
+        order: paginationConfig.order,
     };
-    const res = await searchSnapshotPage(params);
-    data.value = res.data.items || [];
-    paginationConfig.total = res.data.total;
+    loading.value = true;
+    await searchSnapshotPage(params)
+        .then((res) => {
+            loading.value = false;
+            loadSize(params);
+            cleanData.value = false;
+            data.value = res.data.items || [];
+            paginationConfig.total = res.data.total;
+        })
+        .catch(() => {
+            loading.value = false;
+        });
+};
+
+const loadSize = async (params: any) => {
+    await loadSnapshotSize(params)
+        .then((res) => {
+            let stats = res.data || [];
+            if (stats.length === 0) {
+                return;
+            }
+            for (const snap of data.value) {
+                for (const item of stats) {
+                    if (snap.id === item.id) {
+                        snap.hasLoad = true;
+                        snap.size = item.size;
+                        break;
+                    }
+                }
+            }
+        })
+        .catch(() => {
+            loading.value = false;
+        });
 };
 
 onMounted(() => {

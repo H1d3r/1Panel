@@ -3,15 +3,20 @@
         <LayoutContent v-loading="loading" :title="$t('setting.about')" :divider="true">
             <template #main>
                 <div style="text-align: center; margin-top: 20px">
-                    <div style="justify-self: center">
-                        <img style="width: 80px" :src="getLogoUrl()" />
+                    <div style="justify-self: center" class="logo">
+                        <img
+                            v-if="globalStore.themeConfig.logo"
+                            style="width: 80px"
+                            :src="`/api/v1/images/logo?t=${Date.now()}`"
+                        />
+                        <PrimaryLogo v-else />
                     </div>
-                    <h3>{{ globalStore.themeConfig.title || $t('setting.description') }}</h3>
-                    <h3>
+                    <h3 class="description">{{ globalStore.themeConfig.title || $t('setting.description') }}</h3>
+                    <div class="flex justify-center">
                         <SystemUpgrade />
-                    </h3>
-                    <div style="margin-top: 10px">
-                        <el-link @click="toDoc">
+                    </div>
+                    <div class="flex w-full justify-center my-5 flex-wrap md:flex-row gap-4">
+                        <el-link @click="toDoc" class="system-link">
                             <el-icon><Document /></el-icon>
                             <span>{{ $t('setting.doc2') }}</span>
                         </el-link>
@@ -39,7 +44,10 @@ import { getSettingInfo, getSystemAvailable } from '@/api/modules/setting';
 import { onMounted, ref } from 'vue';
 import SystemUpgrade from '@/components/system-upgrade/index.vue';
 import { GlobalStore } from '@/store';
+import PrimaryLogo from '@/assets/images/1panel-logo.svg?component';
+import { storeToRefs } from 'pinia';
 const globalStore = GlobalStore();
+const { docsUrl } = storeToRefs(globalStore);
 
 const version = ref();
 const loading = ref();
@@ -49,7 +57,7 @@ const search = async () => {
 };
 
 const toDoc = () => {
-    window.open('https://1panel.cn/docs/', '_blank', 'noopener,noreferrer');
+    window.open(docsUrl.value, '_blank', 'noopener,noreferrer');
 };
 const toGithub = () => {
     window.open('https://github.com/1Panel-dev/1Panel', '_blank', 'noopener,noreferrer');
@@ -59,14 +67,6 @@ const toIssue = () => {
 };
 const toGithubStar = () => {
     window.open('https://github.com/1Panel-dev/1Panel', '_blank', 'noopener,noreferrer');
-};
-
-const getLogoUrl = () => {
-    if (globalStore.themeConfig.logo) {
-        return '/api/v1/images/logo';
-    } else {
-        return new URL(`../../../assets/images/1panel-logo-light.png`, import.meta.url).href;
-    }
 };
 
 onMounted(() => {
@@ -84,6 +84,21 @@ onMounted(() => {
     }
     span {
         line-height: 20px;
+        font-weight: 400;
+    }
+}
+.description {
+    color: var(--el-text-color-regular);
+}
+.logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 55px;
+    img {
+        object-fit: contain;
+        width: 95%;
+        height: 45px;
     }
 }
 </style>

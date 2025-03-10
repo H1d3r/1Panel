@@ -27,36 +27,52 @@ type SnapshotService struct {
 }
 
 type ISnapshotService interface {
-	SearchWithPage(req dto.SearchWithPage) (int64, interface{}, error)
+	SearchWithPage(req dto.PageSnapshot) (int64, interface{}, error)
+	LoadSize(req dto.PageSnapshot) ([]dto.SnapshotFile, error)
 	SnapshotCreate(req dto.SnapshotCreate) error
 	SnapshotRecover(req dto.SnapshotRecover) error
 	SnapshotRollback(req dto.SnapshotRecover) error
 	SnapshotImport(req dto.SnapshotImport) error
-	Delete(req dto.BatchDeleteReq) error
+	Delete(req dto.SnapshotBatchDelete) error
 
 	LoadSnapShotStatus(id uint) (*dto.SnapshotStatus, error)
 
 	UpdateDescription(req dto.UpdateDescription) error
 	readFromJson(path string) (SnapshotJson, error)
 
-	HandleSnapshot(isCronjob bool, logPath string, req dto.SnapshotCreate, timeNow string) (string, error)
+	HandleSnapshot(isCronjob bool, logPath string, req dto.SnapshotCreate, timeNow string, secret string) (string, error)
 }
 
 func NewISnapshotService() ISnapshotService {
 	return &SnapshotService{}
 }
 
-func (u *SnapshotService) SearchWithPage(req dto.SearchWithPage) (int64, interface{}, error) {
-	total, systemBackups, err := snapshotRepo.Page(req.Page, req.PageSize, commonRepo.WithLikeName(req.Info))
-	var dtoSnap []dto.SnapshotInfo
-	for _, systemBackup := range systemBackups {
+func (u *SnapshotService) SearchWithPage(req dto.PageSnapshot) (int64, interface{}, error) {
+	total, records, err := snapshotRepo.Page(req.Page, req.PageSize, commonRepo.WithLikeName(req.Info), commonRepo.WithOrderRuleBy(req.OrderBy, req.Order))
+	if err != nil {
+		return 0, nil, err
+	}
+	var data []dto.SnapshotInfo
+	for _, record := range records {
 		var item dto.SnapshotInfo
-		if err := copier.Copy(&item, &systemBackup); err != nil {
+		if err := copier.Copy(&item, &record); err != nil {
 			return 0, nil, errors.WithMessage(constant.ErrStructTransform, err.Error())
 		}
-		dtoSnap = append(dtoSnap, item)
+		data = append(data, item)
 	}
-	return total, dtoSnap, err
+	return total, data, err
+}
+
+func (u *SnapshotService) LoadSize(req dto.PageSnapshot) ([]dto.SnapshotFile, error) {
+	_, records, err := snapshotRepo.Page(req.Page, req.PageSize, commonRepo.WithLikeName(req.Info), commonRepo.WithOrderRuleBy(req.OrderBy, req.Order))
+	if err != nil {
+		return nil, err
+	}
+	data, err := loadSnapSize(records)
+	if err != nil {
+		return nil, err
+	}
+	return data, err
 }
 
 func (u *SnapshotService) SnapshotImport(req dto.SnapshotImport) error {
@@ -123,7 +139,7 @@ type SnapshotJson struct {
 }
 
 func (u *SnapshotService) SnapshotCreate(req dto.SnapshotCreate) error {
-	if _, err := u.HandleSnapshot(false, "", req, time.Now().Format("20060102150405")); err != nil {
+	if _, err := u.HandleSnapshot(false, "", req, time.Now().Format(constant.DateTimeSlimLayout), req.Secret); err != nil {
 		return err
 	}
 	return nil
@@ -136,7 +152,7 @@ func (u *SnapshotService) SnapshotRecover(req dto.SnapshotRecover) error {
 		return err
 	}
 	if hasOs(snap.Name) && !strings.Contains(snap.Name, loadOs()) {
-		return fmt.Errorf("Restoring snapshots(%s) between different server architectures(%s) is not supported.", snap.Name, loadOs())
+		return fmt.Errorf("restoring snapshots(%s) between different server architectures(%s) is not supported", snap.Name, loadOs())
 	}
 	if !req.IsNew && len(snap.InterruptStep) != 0 && len(snap.RollbackStatus) != 0 {
 		return fmt.Errorf("the snapshot has been rolled back and cannot be restored again")
@@ -180,7 +196,7 @@ func (u *SnapshotService) readFromJson(path string) (SnapshotJson, error) {
 	return snap, nil
 }
 
-func (u *SnapshotService) HandleSnapshot(isCronjob bool, logPath string, req dto.SnapshotCreate, timeNow string) (string, error) {
+func (u *SnapshotService) HandleSnapshot(isCronjob bool, logPath string, req dto.SnapshotCreate, timeNow string, secret string) (string, error) {
 	localDir, err := loadLocalDir()
 	if err != nil {
 		return "", err
@@ -274,7 +290,7 @@ func (u *SnapshotService) HandleSnapshot(isCronjob bool, logPath string, req dto
 				return
 			}
 			if snapStatus.Compress != constant.StatusDone {
-				snapCompress(itemHelper, rootDir)
+				snapCompress(itemHelper, rootDir, secret)
 			}
 			if snapStatus.Compress != constant.StatusDone {
 				_ = snapshotRepo.Update(snap.ID, map[string]interface{}{"status": constant.StatusFailed})
@@ -305,7 +321,7 @@ func (u *SnapshotService) HandleSnapshot(isCronjob bool, logPath string, req dto
 		return snap.Name, fmt.Errorf("snapshot %s 1panel data failed", snap.Name)
 	}
 	loadLogByStatus(snapStatus, logPath)
-	snapCompress(itemHelper, rootDir)
+	snapCompress(itemHelper, rootDir, secret)
 	if snapStatus.Compress != constant.StatusDone {
 		_ = snapshotRepo.Update(snap.ID, map[string]interface{}{"status": constant.StatusFailed})
 		loadLogByStatus(snapStatus, logPath)
@@ -323,25 +339,25 @@ func (u *SnapshotService) HandleSnapshot(isCronjob bool, logPath string, req dto
 	return snap.Name, nil
 }
 
-func (u *SnapshotService) Delete(req dto.BatchDeleteReq) error {
-	backups, _ := snapshotRepo.GetList(commonRepo.WithIdsIn(req.Ids))
-	localDir, err := loadLocalDir()
-	if err != nil {
-		return err
-	}
-	for _, snap := range backups {
-		itemFile := path.Join(localDir, "system", snap.Name)
-		_ = os.RemoveAll(itemFile)
-
-		itemTarFile := path.Join(global.CONF.System.TmpDir, "system", snap.Name+".tar.gz")
-		_ = os.Remove(itemTarFile)
+func (u *SnapshotService) Delete(req dto.SnapshotBatchDelete) error {
+	snaps, _ := snapshotRepo.GetList(commonRepo.WithIdsIn(req.Ids))
+	for _, snap := range snaps {
+		if req.DeleteWithFile {
+			targetAccounts, err := loadClientMap(snap.From)
+			if err != nil {
+				return err
+			}
+			for _, item := range targetAccounts {
+				global.LOG.Debugf("remove snapshot file %s.tar.gz from %s", snap.Name, item.backType)
+				_, _ = item.client.Delete(path.Join(item.backupPath, "system_snapshot", snap.Name+".tar.gz"))
+			}
+		}
 
 		_ = snapshotRepo.DeleteStatus(snap.ID)
+		if err := snapshotRepo.Delete(commonRepo.WithByID(snap.ID)); err != nil {
+			return err
+		}
 	}
-	if err := snapshotRepo.Delete(commonRepo.WithIdsIn(req.Ids)); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -354,7 +370,7 @@ func updateRecoverStatus(id uint, isRecover bool, interruptStep, status, message
 			"interrupt_step":    interruptStep,
 			"recover_status":    status,
 			"recover_message":   message,
-			"last_recovered_at": time.Now().Format("2006-01-02 15:04:05"),
+			"last_recovered_at": time.Now().Format(constant.DateTimeLayout),
 		}); err != nil {
 			global.LOG.Errorf("update snap recover status failed, err: %v", err)
 		}
@@ -369,7 +385,7 @@ func updateRecoverStatus(id uint, isRecover bool, interruptStep, status, message
 			"interrupt_step":     "",
 			"rollback_status":    "",
 			"rollback_message":   "",
-			"last_rollbacked_at": time.Now().Format("2006-01-02 15:04:05"),
+			"last_rollbacked_at": time.Now().Format(constant.DateTimeLayout),
 		}); err != nil {
 			global.LOG.Errorf("update snap recover status failed, err: %v", err)
 		}
@@ -379,21 +395,27 @@ func updateRecoverStatus(id uint, isRecover bool, interruptStep, status, message
 	if err := snapshotRepo.Update(id, map[string]interface{}{
 		"rollback_status":    status,
 		"rollback_message":   message,
-		"last_rollbacked_at": time.Now().Format("2006-01-02 15:04:05"),
+		"last_rollbacked_at": time.Now().Format(constant.DateTimeLayout),
 	}); err != nil {
 		global.LOG.Errorf("update snap recover status failed, err: %v", err)
 	}
 }
 
-func (u *SnapshotService) handleUnTar(sourceDir, targetDir string) error {
+func (u *SnapshotService) handleUnTar(sourceDir, targetDir string, secret string) error {
 	if _, err := os.Stat(targetDir); err != nil && os.IsNotExist(err) {
 		if err = os.MkdirAll(targetDir, os.ModePerm); err != nil {
 			return err
 		}
 	}
-
-	commands := fmt.Sprintf("tar -zxf %s -C %s .", sourceDir, targetDir)
-	global.LOG.Debug(commands)
+	commands := ""
+	if len(secret) != 0 {
+		extraCmd := "openssl enc -d -aes-256-cbc -k '" + secret + "' -in " + sourceDir + " | "
+		commands = fmt.Sprintf("%s tar -zxvf - -C %s", extraCmd, targetDir+" > /dev/null 2>&1")
+		global.LOG.Debug(strings.ReplaceAll(commands, fmt.Sprintf(" %s ", secret), "******"))
+	} else {
+		commands = fmt.Sprintf("tar zxvfC %s %s", sourceDir, targetDir)
+		global.LOG.Debug(commands)
+	}
 	stdout, err := cmd.ExecWithTimeOut(commands, 30*time.Minute)
 	if err != nil {
 		if len(stdout) != 0 {
@@ -419,16 +441,7 @@ func rebuildAllAppInstall() error {
 		go func(app model.AppInstall) {
 			defer wg.Done()
 			dockerComposePath := app.GetComposePath()
-			out, err := compose.Down(dockerComposePath)
-			if err != nil {
-				_ = handleErr(app, err, out)
-				return
-			}
-			out, err = compose.Up(dockerComposePath)
-			if err != nil {
-				_ = handleErr(app, err, out)
-				return
-			}
+			_, _ = compose.Up(dockerComposePath)
 			app.Status = constant.Running
 			_ = appInstallRepo.Save(context.Background(), &app)
 		}(appInstalls[i])
@@ -503,4 +516,46 @@ func loadOs() string {
 	default:
 		return hostInfo.KernelArch
 	}
+}
+
+func loadSnapSize(records []model.Snapshot) ([]dto.SnapshotFile, error) {
+	var datas []dto.SnapshotFile
+	clientMap := make(map[string]loadSizeHelper)
+	var wg sync.WaitGroup
+	for i := 0; i < len(records); i++ {
+		item := dto.SnapshotFile{Name: records[i].Name, ID: records[i].ID}
+		itemPath := fmt.Sprintf("system_snapshot/%s.tar.gz", item.Name)
+		if _, ok := clientMap[records[i].DefaultDownload]; !ok {
+			backup, err := backupRepo.Get(commonRepo.WithByType(records[i].DefaultDownload))
+			if err != nil {
+				global.LOG.Errorf("load backup model %s from db failed, err: %v", records[i].DefaultDownload, err)
+				clientMap[records[i].DefaultDownload] = loadSizeHelper{}
+				datas = append(datas, item)
+				continue
+			}
+			client, err := NewIBackupService().NewClient(&backup)
+			if err != nil {
+				global.LOG.Errorf("load backup client %s from db failed, err: %v", records[i].DefaultDownload, err)
+				clientMap[records[i].DefaultDownload] = loadSizeHelper{}
+				datas = append(datas, item)
+				continue
+			}
+			item.Size, _ = client.Size(path.Join(strings.TrimLeft(backup.BackupPath, "/"), itemPath))
+			datas = append(datas, item)
+			clientMap[records[i].DefaultDownload] = loadSizeHelper{backupPath: strings.TrimLeft(backup.BackupPath, "/"), client: client, isOk: true}
+			continue
+		}
+		if clientMap[records[i].DefaultDownload].isOk {
+			wg.Add(1)
+			go func(index int) {
+				item.Size, _ = clientMap[records[index].DefaultDownload].client.Size(path.Join(clientMap[records[index].DefaultDownload].backupPath, itemPath))
+				datas = append(datas, item)
+				wg.Done()
+			}(i)
+		} else {
+			datas = append(datas, item)
+		}
+	}
+	wg.Wait()
+	return datas, nil
 }

@@ -72,6 +72,11 @@ var AddTableSetting = &gormigrate.Migration{
 		}
 		global.CONF.System.EncryptKey = encryptKey
 		pass, _ := encrypt.StringEncrypt(global.CONF.System.Password)
+		language := "en"
+		if global.CONF.System.Language == "zh" {
+			language = "zh"
+		}
+
 		if err := tx.Create(&model.Setting{Key: "Password", Value: pass}).Error; err != nil {
 			return err
 		}
@@ -82,10 +87,10 @@ var AddTableSetting = &gormigrate.Migration{
 		if err := tx.Create(&model.Setting{Key: "PanelName", Value: "1Panel"}).Error; err != nil {
 			return err
 		}
-		if err := tx.Create(&model.Setting{Key: "Language", Value: "zh"}).Error; err != nil {
+		if err := tx.Create(&model.Setting{Key: "Language", Value: language}).Error; err != nil {
 			return err
 		}
-		if err := tx.Create(&model.Setting{Key: "Theme", Value: "auto"}).Error; err != nil {
+		if err := tx.Create(&model.Setting{Key: "Theme", Value: "light"}).Error; err != nil {
 			return err
 		}
 
@@ -109,7 +114,7 @@ var AddTableSetting = &gormigrate.Migration{
 			return err
 		}
 
-		if err := tx.Create(&model.Setting{Key: "ExpirationTime", Value: time.Now().AddDate(0, 0, 10).Format("2006-01-02 15:04:05")}).Error; err != nil {
+		if err := tx.Create(&model.Setting{Key: "ExpirationTime", Value: time.Now().AddDate(0, 0, 10).Format(constant.DateTimeLayout)}).Error; err != nil {
 			return err
 		}
 		if err := tx.Create(&model.Setting{Key: "ExpirationDays", Value: "0"}).Error; err != nil {
@@ -238,14 +243,14 @@ var AddDefaultGroup = &gormigrate.Migration{
 	ID: "2023022-change-default-group",
 	Migrate: func(tx *gorm.DB) error {
 		defaultGroup := &model.Group{
-			Name:      "默认",
+			Name:      "Default",
 			IsDefault: true,
 			Type:      "website",
 		}
 		if err := tx.Create(defaultGroup).Error; err != nil {
 			return err
 		}
-		if err := tx.Model(&model.Group{}).Where("name = ? AND type = ?", "default", "host").Update("name", "默认").Error; err != nil {
+		if err := tx.Model(&model.Group{}).Where("name = ? AND type = ?", "default", "host").Update("name", "Default").Error; err != nil {
 			return err
 		}
 		if err := tx.Model(&model.Website{}).Where("1 = 1").Update("website_group_id", defaultGroup.ID).Error; err != nil {

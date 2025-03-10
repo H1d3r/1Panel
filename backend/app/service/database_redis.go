@@ -1,18 +1,20 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/1Panel-dev/1Panel/backend/app/dto"
 	"github.com/1Panel-dev/1Panel/backend/constant"
 	"github.com/1Panel-dev/1Panel/backend/utils/compose"
+	"github.com/1Panel-dev/1Panel/backend/utils/docker"
+	"github.com/1Panel-dev/1Panel/backend/utils/encrypt"
+	"github.com/docker/docker/api/types/container"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -23,11 +25,12 @@ type IRedisService interface {
 	UpdatePersistenceConf(req dto.RedisConfPersistenceUpdate) error
 	ChangePassword(info dto.ChangeRedisPass) error
 
-	LoadStatus() (*dto.RedisStatus, error)
-	LoadConf() (*dto.RedisConf, error)
-	LoadPersistenceConf() (*dto.RedisPersistence, error)
+	LoadStatus(req dto.OperationWithName) (*dto.RedisStatus, error)
+	LoadConf(req dto.OperationWithName) (*dto.RedisConf, error)
+	LoadPersistenceConf(req dto.OperationWithName) (*dto.RedisPersistence, error)
 
-	SearchBackupListWithPage(req dto.PageInfo) (int64, interface{}, error)
+	CheckHasCli() bool
+	InstallCli() error
 }
 
 func NewIRedisService() IRedisService {
@@ -35,7 +38,7 @@ func NewIRedisService() IRedisService {
 }
 
 func (u *RedisService) UpdateConf(req dto.RedisConfUpdate) error {
-	redisInfo, err := appInstallRepo.LoadBaseInfo("redis", "")
+	redisInfo, err := appInstallRepo.LoadBaseInfo("redis", req.Database)
 	if err != nil {
 		return err
 	}
@@ -54,19 +57,54 @@ func (u *RedisService) UpdateConf(req dto.RedisConfUpdate) error {
 	return nil
 }
 
+func (u *RedisService) CheckHasCli() bool {
+	client, err := docker.NewDockerClient()
+	if err != nil {
+		return false
+	}
+	defer client.Close()
+	containerLists, err := client.ContainerList(context.Background(), container.ListOptions{})
+	if err != nil {
+		return false
+	}
+	for _, item := range containerLists {
+		if strings.ReplaceAll(item.Names[0], "/", "") == "1Panel-redis-cli-tools" {
+			return true
+		}
+	}
+	return false
+}
+
+func (u *RedisService) InstallCli() error {
+	item := dto.ContainerOperate{
+		Name:    "1Panel-redis-cli-tools",
+		Image:   "redis:7.2.4",
+		Network: "1panel-network",
+	}
+	return NewIContainerService().ContainerCreate(item)
+}
+
 func (u *RedisService) ChangePassword(req dto.ChangeRedisPass) error {
-	if err := updateInstallInfoInDB("redis", "", "password", req.Value); err != nil {
+	if err := updateInstallInfoInDB("redis", req.Database, "password", req.Value); err != nil {
 		return err
 	}
-	if err := updateInstallInfoInDB("redis-commander", "", "password", req.Value); err != nil {
+	remote, err := databaseRepo.Get(commonRepo.WithByName(req.Database))
+	if err != nil {
 		return err
+	}
+	if remote.From == "local" {
+		pass, err := encrypt.StringEncrypt(req.Value)
+		if err != nil {
+			return fmt.Errorf("decrypt database password failed, err: %v", err)
+		}
+		_ = databaseRepo.Update(remote.ID, map[string]interface{}{"password": pass})
 	}
 
 	return nil
 }
 
 func (u *RedisService) UpdatePersistenceConf(req dto.RedisConfPersistenceUpdate) error {
-	redisInfo, err := appInstallRepo.LoadBaseInfo("redis", "")
+	redisInfo, err := appInstallRepo.LoadBaseInfo("redis", req.Database)
 	if err != nil {
 		return err
 	}
@@ -88,8 +126,8 @@ func (u *RedisService) UpdatePersistenceConf(req dto.RedisConfPersistenceUpdate)
 	return nil
 }
 
-func (u *RedisService) LoadStatus() (*dto.RedisStatus, error) {
-	redisInfo, err := appInstallRepo.LoadBaseInfo("redis", "")
+func (u *RedisService) LoadStatus(req dto.OperationWithName) (*dto.RedisStatus, error) {
+	redisInfo, err := appInstallRepo.LoadBaseInfo("redis", req.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -116,8 +154,8 @@ func (u *RedisService) LoadStatus() (*dto.RedisStatus, error) {
 	return &info, nil
 }
 
-func (u *RedisService) LoadConf() (*dto.RedisConf, error) {
-	redisInfo, err := appInstallRepo.LoadBaseInfo("redis", "")
+func (u *RedisService) LoadConf(req dto.OperationWithName) (*dto.RedisConf, error) {
+	redisInfo, err := appInstallRepo.LoadBaseInfo("redis", req.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -133,8 +171,8 @@ func (u *RedisService) LoadConf() (*dto.RedisConf, error) {
 	return &item, nil
 }
 
-func (u *RedisService) LoadPersistenceConf() (*dto.RedisPersistence, error) {
-	redisInfo, err := appInstallRepo.LoadBaseInfo("redis", "")
+func (u *RedisService) LoadPersistenceConf(req dto.OperationWithName) (*dto.RedisPersistence, error) {
+	redisInfo, err := appInstallRepo.LoadBaseInfo("redis", req.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -149,46 +187,6 @@ func (u *RedisService) LoadPersistenceConf() (*dto.RedisPersistence, error) {
 		return nil, err
 	}
 	return &item, nil
-}
-
-func (u *RedisService) SearchBackupListWithPage(req dto.PageInfo) (int64, interface{}, error) {
-	var (
-		list      []dto.DatabaseFileRecords
-		backDatas []dto.DatabaseFileRecords
-	)
-	redisInfo, err := appInstallRepo.LoadBaseInfo("redis", "")
-	if err != nil {
-		return 0, nil, err
-	}
-	localDir, err := loadLocalDir()
-	if err != nil {
-		return 0, nil, err
-	}
-	backupDir := path.Join(localDir, fmt.Sprintf("database/redis/%s", redisInfo.Name))
-	_ = filepath.Walk(backupDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if !info.IsDir() {
-			list = append(list, dto.DatabaseFileRecords{
-				CreatedAt: info.ModTime().Format("2006-01-02 15:04:05"),
-				Size:      int(info.Size()),
-				FileDir:   backupDir,
-				FileName:  info.Name(),
-			})
-		}
-		return nil
-	})
-	total, start, end := len(list), (req.Page-1)*req.PageSize, req.Page*req.PageSize
-	if start > total {
-		backDatas = make([]dto.DatabaseFileRecords, 0)
-	} else {
-		if end >= total {
-			end = total
-		}
-		backDatas = list[start:end]
-	}
-	return int64(total), backDatas, nil
 }
 
 func configGetStr(containerName, password, param string) (string, error) {

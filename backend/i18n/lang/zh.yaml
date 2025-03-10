@@ -8,6 +8,11 @@ ErrStructTransform: "类型转换失败: {{ .detail }}"
 ErrNotLogin: "用户未登录: {{ .detail }}"
 ErrPasswordExpired: "当前密码已过期: {{ .detail }}"
 ErrNotSupportType: "系统暂不支持当前类型: {{ .detail }}"
+ErrApiConfigStatusInvalid: "API 接口禁止访问: {{ .detail }}"
+ErrApiConfigKeyInvalid: "API 接口密钥错误: {{ .detail }}"
+ErrApiConfigIPInvalid: "调用 API 接口 IP 不在白名单: {{ .detail }}"
+ErrApiConfigDisable: "此接口禁止使用 API 接口调用: {{ .detail }}"
+ErrApiConfigKeyTimeInvalid: "API 接口时间戳错误: {{ .detail }}"
 
 #common
 ErrNameIsExist: "名称已存在"
@@ -37,56 +42,65 @@ Err1PanelNetworkFailed: '默认容器网络创建失败！{{ .detail }}'
 ErrFileParse: '应用 docker-compose 文件解析失败!'
 ErrInstallDirNotFound: '安装目录不存在'
 AppStoreIsUpToDate: '应用商店已经是最新版本'
-LocalAppVersionNull: '{{.name}} 应用未同步到版本！无法添加到应用列表'
-LocalAppVersionErr: '{{.name}} 同步版本 {{.version}} 失败！{{.err}}'
-ErrFileNotFound: '{{.name}} 文件不存在'
-ErrFileParseApp: '{{.name}} 文件解析失败 {{.err}}'
+LocalAppVersionNull: '{{ .name }} 应用未同步到版本！无法添加到应用列表'
+LocalAppVersionErr: '{{ .name }} 同步版本 {{ .version }} 失败！{{ .err }}'
+ErrFileNotFound: '{{ .name }} 文件不存在'
+ErrFileParseApp: '{{ .name }} 文件解析失败 {{ .err }}'
 ErrAppDirNull: '版本文件夹不存在'
-LocalAppErr: "应用 {{.name}} 同步失败！{{.err}}"
+LocalAppErr: "应用 {{ .name }} 同步失败！{{ .err }}"
 ErrContainerName: "容器名称已存在"
 ErrAppSystemRestart: "1Panel 重启导致任务终止"
-ErrCreateHttpClient: "创建HTTP请求失败 {{.err}}"
-ErrHttpReqTimeOut: "请求超时 {{.err}}"
-ErrHttpReqFailed: "请求失败 {{.err}}"
+ErrCreateHttpClient: "创建HTTP请求失败 {{ .err }}"
+ErrHttpReqTimeOut: "请求超时 {{ .err }}"
+ErrHttpReqFailed: "请求失败 {{ .err }}"
 ErrHttpReqNotFound: "文件不存在"
 ErrNoSuchHost: "网络连接失败"
 ErrImagePullTimeOut: '镜像拉取超时'
 ErrContainerNotFound: '{{ .name }} 容器不存在'
 ErrContainerMsg: '{{ .name }} 容器异常，具体请在容器页面查看日志'
-ErrAppBackup: '{{ .name }} 应用备份失败 err {{.err}}'
-ErrImagePull: '镜像拉取失败 {{.err}}'
+ErrAppBackup: '{{ .name }} 应用备份失败 err {{ .err }}'
+ErrImagePull: '镜像拉取失败 {{ .err }}'
 ErrVersionTooLow: '当前 1Panel 版本过低，无法更新应用商店，请升级版本之后操作'
 ErrAppNameExist: '应用名称已存在'
 AppStoreIsSyncing: '应用商店正在同步中，请稍后再试'
 ErrGetCompose: "docker-compose.yml 文件获取失败！{{ .detail }}"
 ErrAppWarn: "状态异常，请查看日志"
 ErrAppParamKey: "参数 {{ .name }} 字段异常"
+ErrAppUpgrade: "应用 {{ .name }} 升级失败 {{ .err }}"
+AppRecover: "应用  {{ .name }} 回滚 "
+PullImageStart: "开始拉取镜像 {{ .name }}"
+PullImageSuccess: "镜像拉取成功"
+UpgradeAppStart: "开始升级应用 {{ .name }}"
+UpgradeAppSuccess: "应用  {{ .name }} 升级成功"
 
 #file
 ErrFileCanNotRead: "此文件不支持预览"
-ErrFileToLarge: "文件超过10M,无法打开"
+ErrFileToLarge: "文件超过10M，无法打开"
 ErrPathNotFound: "目录不存在"
 ErrMovePathFailed: "目标路径不能包含原路径！"
 ErrLinkPathNotFound: "目标路径不存在!"
-ErrFileIsExit: "文件已存在！"
-ErrFileUpload: "{{ .name }} 上传文件失败 {{ .detail}}"
+ErrFileIsExist: "文件或文件夹已存在！"
+ErrFileUpload: "{{ .name }} 上传文件失败 {{ .detail }}"
 ErrFileDownloadDir: "不支持下载文件夹"
 ErrCmdNotFound: "{{ .name}} 命令不存在，请先在宿主机安装此命令"
 ErrSourcePathNotFound:  "源目录不存在"
 ErrFavoriteExist: "已收藏此路径"
 ErrInvalidChar: "禁止使用非法字符"
+ErrPathNotDelete: "所选目录不可删除"
 
 #website
 ErrDomainIsExist: "域名已存在"
 ErrAliasIsExist: "代号已存在"
-ErrAppDelete: '其他网站使用此应用,无法删除'
+ErrAppDelete: '其他网站使用此应用，无法删除'
 ErrGroupIsUsed: '分组正在使用中，无法删除'
-ErrBackupMatch: '该备份文件与当前网站部分数据不匹配 {{ .detail}}"'
-ErrBackupExist: '该备份文件对应部分源数据不存在 {{ .detail}}"'
+ErrBackupMatch: '该备份文件与当前网站部分数据不匹配 {{ .detail }}'
+ErrBackupExist: '该备份文件对应部分源数据不存在 {{ .detail }}'
 ErrPHPResource: '本地运行环境不支持切换！'
-ErrPathPermission: 'index 目录下检测到非 1000:1000 权限文件夹，可能导致网站访问 Access denied 错误'
+ErrPathPermission: 'index 目录下检测到非 1000:1000 权限文件夹，可能导致网站访问 Access denied 错误，请点击上方保存按钮'
 ErrDomainIsUsed: "域名已被网站【{{ .name }}】使用"
 ErrDomainFormat: "{{ .name }} 域名格式不正确"
+ErrDefaultAlias: "default 为保留代号，请使用其他代号"
+ErrImageNotExist: "运行环境 {{ .name }} 镜像不存在，请重新编辑运行环境"
 
 #ssl
 ErrSSLCannotDelete: "{{ .name }} 证书正在被网站使用，无法删除"
@@ -99,13 +113,13 @@ ErrSSLKeyFormat: '私钥文件校验失败'
 ErrSSLCertificateFormat: '证书文件格式错误，请使用 pem 格式'
 ErrEabKidOrEabHmacKeyCannotBlank: 'EabKid 或 EabHmacKey 不能为空'
 ErrOpenrestyNotFound: 'Http 模式需要首先安装 Openresty'
-ApplySSLStart: '开始申请证书,域名 [{{ .domain }}] 申请方式 [{{ .type }}] '
+ApplySSLStart: '开始申请证书，域名 [{{ .domain }}] 申请方式 [{{ .type }}] '
 dnsAccount: "DNS 自动"
 dnsManual: "DNS 手动"
 http: "HTTP"
-ApplySSLFailed: '申请  [{{ .domain }}] 证书失败, {{.detail}} '
+ApplySSLFailed: '申请  [{{ .domain }}] 证书失败， {{ .detail }} '
 ApplySSLSuccess: '申请 [{{ .domain }}] 证书成功！！'
-DNSAccountName: 'DNS 账号 [{{ .name }}] 厂商 [{{.type}}]'
+DNSAccountName: 'DNS 账号 [{{ .name }}] 厂商 [{{ .type }}]'
 PushDirLog: '证书推送到目录 [{{ .path }}] {{ .status }}'
 ErrDeleteCAWithSSL: "当前机构下存在已签发证书，无法删除"
 ErrDeleteWithPanelSSL: "面板 SSL 配置使用此证书，无法删除"
@@ -113,6 +127,11 @@ ErrDefaultCA: "默认机构不能删除"
 ApplyWebSiteSSLLog: "开始更新 {{ .name }} 网站证书"
 ErrUpdateWebsiteSSL: "{{ .name }} 网站更新证书失败: {{ .err }}"
 ApplyWebSiteSSLSuccess: "更新网站证书成功"
+ErrExecShell: "执行脚本失败 {{ .err }}"
+ExecShellStart: "开始执行脚本"
+ExecShellSuccess: "脚本执行成功"
+StartUpdateSystemSSL: "开始更新系统证书"
+UpdateSystemSSLSuccess: "更新系统证书成功"
 
 #mysql
 ErrUserIsExist: "当前用户已存在，请重新输入"
@@ -124,9 +143,10 @@ ErrLocalExist: "本地数据库已存在该名称，请修改后重试"
 #redis
 ErrTypeOfRedis: "恢复文件类型与当前持久化方式不符，请修改后重试"
 
-#container 
+#container
 ErrInUsed: "{{ .detail }} 正被使用，无法删除"
 ErrObjectInUsed: "该对象正被使用，无法删除"
+ErrObjectBeDependent: "该镜像依赖于其他镜像，无法删除"
 ErrPortRules: "端口数目不匹配，请重新输入！"
 ErrPgImagePull: "镜像拉取超时，请配置镜像加速或手动拉取 postgres:16.0-alpine 镜像后重试"
 
@@ -144,7 +164,7 @@ ErrNodeModulesNotFound: "node_modules 文件夹不存在！请编辑运行环境
 
 #setting
 ErrBackupInUsed: "该备份账号已在计划任务中使用，无法删除"
-ErrBackupCheck: "备份账号测试连接失败 {{ .err}}"
+ErrBackupCheck: "备份账号测试连接失败 {{ .err }}"
 ErrOSSConn: "无法获取最新版本，请确认服务器是否能够连接外部网络。"
 ErrEntrance: "安全入口信息错误，请检查后重试！"
 
@@ -157,7 +177,8 @@ ErrConfigAlreadyExist: "已存在同名配置文件"
 ErrUserFindErr: "用户 {{ .name }} 查找失败 {{ .err }}"
 
 #ssh
-ErrFirewall: "当前未检测到系统 firewalld 或 ufw 服务，请检查后重试！"
+ErrFirewallNone: "未检测到系统 firewalld 或 ufw 服务，请检查后重试！"
+ErrFirewallBoth: "检测到系统同时存在 firewalld 或 ufw 服务，为避免冲突，请卸载后重试！"
 
 #cronjob
 ErrBashExecute: "脚本执行错误，请在任务输出文本域中查看具体信息。"
@@ -167,24 +188,108 @@ CutWebsiteLogSuccess: "{{ .name }} 网站日志切割成功，备份路径 {{ .p
 #toolbox
 ErrNotExistUser: "当前用户不存在，请修改后重试！"
 ErrBanAction: "设置失败，当前 {{ .name }} 服务不可用，请检查后重试！"
+ErrClamdscanNotFound: "未检测到 clamdscan 命令，请参考文档安装！"
 
 #waf
 ErrScope: "不支持修改此配置"
 ErrStateChange: "状态修改失败"
-ErrRuleExist: "规则名称已存在"
+ErrRuleExist: "规则已存在"
 ErrRuleNotExist: "规则不存在"
 ErrParseIP: "IP 格式错误"
 ErrDefaultIP: "default 为保留名称，请更换其他名称"
 ErrGroupInUse: "IP 组被黑/白名单使用，无法删除"
 ErrGroupExist: "IP 组名称已存在"
 ErrIPRange: "IP 范围错误"
+ErrIPExist: "IP 已存在"
 
 #license
 ErrLicense: "许可证格式错误，请检查后重试！"
 ErrLicenseCheck: "许可证校验失败，请检查后重试！"
+ErrXpackVersion: "许可证校验失败，该许可证受版本限制，无法成功导入，请检查后重试！"
 ErrLicenseSave: "许可证信息保存失败，错误 {{ .err }}，请重试！"
 ErrLicenseSync: "许可证信息同步失败，数据库中未检测到许可证信息！"
 ErrXpackNotFound: "该部分为专业版功能，请先在 面板设置-许可证 界面导入许可证"
 ErrXpackNotActive: "该部分为专业版功能，请先在 面板设置-许可证 界面同步许可证状态"
 ErrXpackOutOfDate: "当前许可证已过期，请重新在 面板设置-许可证 界面导入许可证"
+ErrXpackLost: "许可证已达到最大重试次数，请进入【面板设置】【许可证】页面手动点击同步按钮，以确保专业版功能正常使用"
+ErrXpackTimeout: "请求超时，网络连接可能不稳定，请稍后再试！"
 
+#license
+ErrAlert: "告警信息格式错误，请检查后重试！"
+ErrAlertPush: "告警信息推送错误，请检查后重试！"
+ErrAlertSave: "告警信息保存错误，请检查后重试！"
+ErrAlertSync: "告警信息同步错误，请检查后重试！"
+ErrAlertRemote: "告警信息远端错误，请检查后重试！"
+
+#cmd
+AppVersion: "应用版本"
+AppCommands: "应用相关命令"
+AppInit: "初始化应用"
+AppKeyVal: "应用的 key（仅支持英文）"
+AppCreateFileErr: "文件 {{ .name }} 创建失败 {{ .err }}"
+AppCreateDirErr: "文件夹 {{ .name }} 创建失败 {{ .err }}"
+AppMissKey: "应用的 key 缺失，使用 -k 指定"
+AppMissVersion: "应用版本缺失，使用 -v 指定"
+AppVersionExist: "版本已存在！"
+AppCreateSuccessful: "创建成功！"
+AppWriteErr: "文件 {{ .name }} 写入失败 {{ .err }}"
+SudoHelper: "请使用 {{ .cmd }} 或者切换到 root 用户"
+ListenIPCommands: "切换监听 IP"
+ListenIPv4: "监听 IPv4"
+ListenIPv6: "监听 IPv6"
+ListenChangeSuccessful: "切换成功！已切换至监听 {{ .value }}"
+ResetCommands: "重置系统信息"
+ResetMFA: "取消 1Panel 两步验证"
+ResetHttps: "取消 1Panel https 方式登录"
+ResetEntrance: "取消 1Panel 安全入口"
+ResetIPs: "取消 1Panel 授权 IP 限制"
+ResetDomain: "取消 1Panel 访问域名绑定"
+RestoreCommands: "回滚 1Panel 服务及数据"
+RestoreNoSuchFile: "暂无可回滚文件"
+RestoreStep1: "（1/5）开始从 {{ .name }} 目录回滚 1Panel 服务及数据... "
+RestoreStep2: "（2/5）1Panel 二进制回滚成功"
+RestoreStep3: "（3/5）1Panel 脚本回滚成功"
+RestoreStep4: "（4/5）1Panel 服务回滚成功"
+RestoreStep5: "（5/5）1Panel 数据回滚成功"
+RestoreSuccessful: "回滚成功！正在重启服务，请稍候..."
+UpdateCommands: "修改面板信息"
+UpdateUser: "修改面板用户"
+UpdatePassword: "修改面板密码"
+UpdatePort: "修改面板端口"
+UpdateUserNull: "错误: 输入面板用户为空！"
+UpdateUserBlank: "错误: 输入面板用户中包含空格字符！"
+UpdateUserFormat: "错误: 输入面板用户错误！仅支持英文、中文、数字和_，长度3-30"
+UpdateUserErr: "错误: 面板用户修改失败，{{ .err }}"
+UpdateSuccessful: "修改成功！"
+UpdateUserResult: "面板用户: {{ .name }}"
+UpdatePasswordRead: "错误: 面板密码信息读取错误，{{ .err }}"
+UpdatePasswordNull: "错误: 输入面板密码为空！"
+UpdateUPasswordBlank: "错误: 输入面板密码中包含空格字符！"
+UpdatePasswordFormat: "错误: 面板密码仅支持字母、数字、特殊字符（!@#$%*_,.?），长度 8-30 位！"
+UpdatePasswordLen: "错误: 请输入 6 位以上密码！"
+UpdatePasswordRe: "确认密码: "
+UpdatePasswordErr: "错误: 面板密码修改失败，{{ .err }}"
+UpdatePasswordSame: "错误: 两次密码不匹配，请检查后重试！"
+UpdatePasswordResult: "面板密码: {{ .name }}"
+UpdatePortFormat: "错误: 输入的端口号必须在 1 到 65535 之间！"
+UpdatePortUsed: "错误: 该端口号正被占用，请检查后重试！"
+UpdatePortErr: "错误: 面板端口修改失败，{{ .err }}"
+UpdatePortResult: "面板端口: {{ .name }}"
+UpdatePortFirewallAdd: "添加防火墙端口规则失败，{{ .err }}，请您手动将 {{ .name }} 端口添加至防火墙规则中。"
+UpdatePortFirewallDel: "错误: 防火墙端口删除失败，{{ .err }}"
+UpdatePortFirewallReload: "防火墙重载失败，{{ .err }}，请您手动重载防火墙。"
+UserInfo: "获取面板信息"
+UserInfoAddr: "面板地址: "
+UserInfoPassHelp: "提示: 修改密码可执行命令: "
+DBConnErr: "错误: 初始化数据库连接失败，{{ .err }}"
+SystemVersion: "版本: "
+SystemMode: "模式: "
+
+#ai-tool
+ErrOpenrestyInstall: '请先安装 Openresty'
+ErrSSL: "证书内容为空，请检查证书!"
+
+#mobile app
+ErrVerifyToken: '令牌验证错误，请重置后再次扫码'
+ErrInvalidToken: '无效的令牌，请重置后再次扫码'
+ErrExpiredToken: '令牌过期，请重置后再次扫码'

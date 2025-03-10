@@ -15,7 +15,7 @@ func (s *ContainerRouter) InitRouter(Router *gin.RouterGroup) {
 		Use(middleware.PasswordExpired())
 	baseApi := v1.ApiGroupApp.BaseApi
 	{
-		baRouter.GET("/exec", baseApi.ContainerWsSsh)
+		baRouter.GET("/exec", baseApi.ContainerWsSSH)
 		baRouter.GET("/stats/:id", baseApi.ContainerStats)
 
 		baRouter.POST("", baseApi.ContainerCreate)
@@ -26,11 +26,13 @@ func (s *ContainerRouter) InitRouter(Router *gin.RouterGroup) {
 		baRouter.POST("/list", baseApi.ListContainer)
 		baRouter.GET("/list/stats", baseApi.ContainerListStats)
 		baRouter.GET("/search/log", baseApi.ContainerLogs)
+		baRouter.POST("/download/log", baseApi.DownloadContainerLogs)
 		baRouter.GET("/limit", baseApi.LoadResourceLimit)
 		baRouter.POST("/clean/log", baseApi.CleanContainerLog)
 		baRouter.POST("/load/log", baseApi.LoadContainerLog)
 		baRouter.POST("/inspect", baseApi.Inspect)
 		baRouter.POST("/rename", baseApi.ContainerRename)
+		baRouter.POST("/commit", baseApi.ContainerCommit)
 		baRouter.POST("/operate", baseApi.ContainerOperation)
 		baRouter.POST("/prune", baseApi.ContainerPrune)
 

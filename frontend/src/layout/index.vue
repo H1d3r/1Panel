@@ -2,7 +2,7 @@
     <div :class="classObj" class="app-wrapper" v-loading="loading" :element-loading-text="loadingText" fullscreen>
         <div v-if="classObj.mobile && classObj.openSidebar" class="drawer-bg" @click="handleClickOutside" />
         <div class="app-sidebar" v-if="!globalStore.isFullScreen">
-            <Sidebar @menu-click="handleMenuClick" :menu-router="!classObj.openMenuTabs" />
+            <Sidebar @menu-click="handleMenuClick" />
         </div>
 
         <div class="main-container">
@@ -20,11 +20,11 @@ import { Sidebar, Footer, AppMain, MobileHeader, Tabs } from './components';
 import useResize from './hooks/useResize';
 import { GlobalStore, MenuStore, TabsStore } from '@/store';
 import { DeviceType } from '@/enums/app';
-import { useI18n } from 'vue-i18n';
-import { useTheme } from '@/hooks/use-theme';
-import { getLicenseStatus, getSettingInfo, getSystemAvailable } from '@/api/modules/setting';
+import { getSystemAvailable } from '@/api/modules/setting';
 import { useRoute, useRouter } from 'vue-router';
-import { initFavicon, resetXSetting } from '@/utils/xpack';
+import { loadProductProFromDB } from '@/utils/xpack';
+import { useTheme } from '@/hooks/use-theme';
+const { switchTheme } = useTheme();
 useResize();
 
 const router = useRouter();
@@ -33,19 +33,11 @@ const menuStore = MenuStore();
 const globalStore = GlobalStore();
 const tabsStore = TabsStore();
 
-const i18n = useI18n();
 const loading = ref(false);
 const loadingText = ref();
-const themeConfig = computed(() => globalStore.themeConfig);
-const { switchDark } = useTheme();
 
 let timer: NodeJS.Timer | null = null;
 
-onMounted(() => {
-    if (!tabsStore.activeTabPath) {
-        handleMenuClick('/');
-    }
-});
 const classObj = computed(() => {
     return {
         fullScreen: globalStore.isFullScreen,
@@ -76,67 +68,6 @@ const handleMenuClick = async (path) => {
     tabsStore.activeTabPath = route.path;
 };
 
-const loadDataFromDB = async () => {
-    const res = await getSettingInfo();
-    document.title = res.data.panelName;
-    i18n.locale.value = res.data.language;
-    i18n.warnHtmlMessage = false;
-    globalStore.entrance = res.data.securityEntrance;
-    globalStore.setOpenMenuTabs(res.data.menuTabs === 'enable');
-    globalStore.updateLanguage(res.data.language);
-    globalStore.setThemeConfig({ ...themeConfig.value, theme: res.data.theme });
-    globalStore.setThemeConfig({ ...themeConfig.value, panelName: res.data.panelName });
-    switchDark();
-};
-
-const loadDataFromXDB = async () => {
-    const xpackModules = import.meta.globEager('../xpack/api/modules/*.ts');
-    if (xpackModules['../xpack/api/modules/setting.ts']) {
-        const searchXSetting = xpackModules['../xpack/api/modules/setting.ts'].searchXSetting;
-        if (searchXSetting) {
-            const res = await searchXSetting();
-            globalStore.themeConfig.title = res.data.title;
-            globalStore.themeConfig.logo = res.data.logo;
-            globalStore.themeConfig.logoWithText = res.data.logoWithText;
-            globalStore.themeConfig.favicon = res.data.favicon;
-        } else {
-            resetXSetting();
-        }
-    } else {
-        resetXSetting();
-    }
-    initFavicon();
-};
-
-const loadProductProFromDB = async () => {
-    const res = await getLicenseStatus();
-    if (!res.data) {
-        globalStore.isProductPro = false;
-        return;
-    }
-    globalStore.isProductPro =
-        res.data.status === 'Enable' || res.data.status === 'Lost01' || res.data.status === 'Lost02';
-
-    if (globalStore.isProductPro) {
-        loadDataFromXDB();
-        globalStore.productProExpires = Number(res.data.productPro);
-    } else {
-        globalStore.themeConfig.title = '';
-        globalStore.themeConfig.logo = '';
-        globalStore.themeConfig.logoWithText = '';
-        globalStore.themeConfig.favicon = '';
-    }
-};
-
-const updateDarkMode = async (event: MediaQueryListEvent) => {
-    const res = await getSettingInfo();
-    if (res.data.theme !== 'auto') {
-        return;
-    }
-    globalStore.setThemeConfig({ ...themeConfig.value, theme: event.matches ? 'dark' : 'light' });
-    switchDark();
-};
-
 const loadStatus = async () => {
     loading.value = globalStore.isLoading;
     loadingText.value = globalStore.loadingText;
@@ -163,19 +94,21 @@ onBeforeUnmount(() => {
     timer = null;
 });
 onMounted(() => {
-    loadStatus();
-    initFavicon();
-    loadDataFromDB();
-    loadProductProFromDB();
+    if (globalStore.openMenuTabs && !tabsStore.activeTabPath) {
+        handleMenuClick('/');
+    }
 
+    loadStatus();
+    loadProductProFromDB();
+    globalStore.isFullScreen = false;
     const mqList = window.matchMedia('(prefers-color-scheme: dark)');
     if (mqList.addEventListener) {
-        mqList.addEventListener('change', (e) => {
-            updateDarkMode(e);
+        mqList.addEventListener('change', () => {
+            switchTheme();
         });
     } else if (mqList.addListener) {
-        mqList.addListener((e) => {
-            updateDarkMode(e);
+        mqList.addListener(() => {
+            switchTheme();
         });
     }
 });
@@ -204,7 +137,7 @@ onMounted(() => {
     height: 100vh;
     transition: margin-left 0.3s;
     margin-left: var(--panel-menu-width);
-    background-color: #f4f4f4;
+    background-color: var(--panel-main-bg-color-9);
     overflow-x: hidden;
 }
 .app-main {

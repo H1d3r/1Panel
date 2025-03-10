@@ -3,17 +3,17 @@
         <RouterButton
             :buttons="[
                 {
-                    label: i18n.global.t('cronjob.cronTask'),
+                    label: i18n.global.t('cronjob.cronTask', 2),
                     path: '/cronjobs',
                 },
             ]"
         />
-        <LayoutContent v-loading="loading" v-if="!isRecordShow" :title="$t('cronjob.cronTask')">
+        <LayoutContent v-loading="loading" v-if="!isRecordShow" :title="$t('cronjob.cronTask', 2)">
             <template #toolbar>
-                <el-row>
-                    <el-col :xs="24" :sm="16" :md="16" :lg="16" :xl="16">
+                <div class="flex justify-between gap-2 flex-wrap sm:flex-row">
+                    <div class="flex flex-wrap gap-3">
                         <el-button type="primary" @click="onOpenDialog('create')">
-                            {{ $t('commons.button.create') }}{{ $t('cronjob.cronTask') }}
+                            {{ $t('cronjob.create') }}
                         </el-button>
                         <el-button-group class="ml-4">
                             <el-button plain :disabled="selects.length === 0" @click="onBatchChangeStatus('enable')">
@@ -26,12 +26,12 @@
                                 {{ $t('commons.button.delete') }}
                             </el-button>
                         </el-button-group>
-                    </el-col>
-                    <el-col :xs="24" :sm="8" :md="8" :lg="8" :xl="8">
+                    </div>
+                    <div class="flex flex-wrap gap-3">
                         <TableSetting @search="search()" />
                         <TableSearch @search="search()" v-model:searchName="searchName" />
-                    </el-col>
-                </el-row>
+                    </div>
+                </div>
             </template>
             <template #main>
                 <ComplexTable
@@ -42,12 +42,20 @@
                     :data="data"
                 >
                     <el-table-column type="selection" fix />
-                    <el-table-column :label="$t('cronjob.taskName')" :min-width="120" prop="name" sortable>
+                    <el-table-column
+                        :label="$t('cronjob.taskName')"
+                        :min-width="120"
+                        prop="name"
+                        sortable
+                        show-overflow-tooltip
+                    >
                         <template #default="{ row }">
-                            <Tooltip @click="loadDetail(row)" :text="row.name" />
+                            <el-text type="primary" class="cursor-pointer" @click="loadDetail(row)">
+                                {{ row.name }}
+                            </el-text>
                         </template>
                     </el-table-column>
-                    <el-table-column :label="$t('commons.table.status')" :min-width="80" prop="status" sortable>
+                    <el-table-column :label="$t('commons.table.status')" :min-width="110" prop="status" sortable>
                         <template #default="{ row }">
                             <el-button
                                 v-if="row.status === 'Enable'"
@@ -90,7 +98,7 @@
                             </div>
                         </template>
                     </el-table-column>
-                    <el-table-column :label="$t('cronjob.retainCopies')" :min-width="90" prop="retainCopies">
+                    <el-table-column :label="$t('cronjob.retainCopies')" :min-width="120" prop="retainCopies">
                         <template #default="{ row }">
                             <el-button v-if="hasBackup(row.type)" @click="loadBackups(row)" plain size="small">
                                 {{ row.retainCopies }}{{ $t('cronjob.retainCopiesUnit') }}
@@ -103,7 +111,7 @@
                             {{ row.lastRecordTime }}
                         </template>
                     </el-table-column>
-                    <el-table-column :min-width="80" :label="$t('setting.backupAccount')" prop="defaultDownload">
+                    <el-table-column :min-width="120" :label="$t('setting.backupAccount')" prop="defaultDownload">
                         <template #default="{ row }">
                             <span v-if="!hasBackup(row.type)">-</span>
                             <div v-else>
@@ -142,6 +150,8 @@
                         :buttons="buttons"
                         :ellipsis="10"
                         :label="$t('commons.table.operate')"
+                        :min-width="mobile ? 'auto' : 200"
+                        :fixed="mobile ? false : 'right'"
                         fix
                     />
                 </ComplexTable>
@@ -170,13 +180,14 @@
 import OperateDialog from '@/views/cronjob/operate/index.vue';
 import Records from '@/views/cronjob/record/index.vue';
 import Backups from '@/views/cronjob/backup/index.vue';
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { deleteCronjob, getCronjobPage, handleOnce, updateStatus } from '@/api/modules/cronjob';
 import i18n from '@/lang';
 import { Cronjob } from '@/api/interface/cronjob';
 import { ElMessageBox } from 'element-plus';
 import { MsgSuccess } from '@/utils/message';
 import { transSpecToStr } from './helper';
+import { GlobalStore } from '@/store';
 
 const loading = ref();
 const selects = ref<any>([]);
@@ -197,6 +208,12 @@ const paginationConfig = reactive({
     order: 'null',
 });
 const searchName = ref();
+
+const globalStore = GlobalStore();
+
+const mobile = computed(() => {
+    return globalStore.isMobile();
+});
 
 const search = async (column?: any) => {
     paginationConfig.orderBy = column?.order ? column.prop : paginationConfig.orderBy;
@@ -382,7 +399,7 @@ const buttons = [
         },
     },
     {
-        label: i18n.global.t('cronjob.record'),
+        label: i18n.global.t('cronjob.viewRecords'),
         click: (row: Cronjob.CronjobInfo) => {
             loadDetail(row);
         },

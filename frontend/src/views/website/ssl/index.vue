@@ -1,26 +1,28 @@
 <template>
     <div>
         <RouterButton :buttons="routerButton" />
-        <LayoutContent :title="$t('website.ssl')">
+        <LayoutContent :title="$t('website.ssl', 2)">
             <template #toolbar>
-                <el-button type="primary" @click="openSSL()">
-                    {{ $t('ssl.create') }}
-                </el-button>
-                <el-button type="primary" @click="openUpload()">
-                    {{ $t('ssl.upload') }}
-                </el-button>
-                <el-button type="primary" plain @click="openCA()">
-                    {{ $t('ssl.selfSigned') }}
-                </el-button>
-                <el-button type="primary" plain @click="openAcmeAccount()">
-                    {{ $t('website.acmeAccountManage') }}
-                </el-button>
-                <el-button type="primary" plain @click="openDnsAccount()">
-                    {{ $t('website.dnsAccountManage') }}
-                </el-button>
-                <el-button plain @click="deleteSSL(null)" :disabled="selects.length === 0">
-                    {{ $t('commons.button.delete') }}
-                </el-button>
+                <div class="flex flex-wrap gap-3">
+                    <el-button type="primary" @click="openSSL()">
+                        {{ $t('ssl.create') }}
+                    </el-button>
+                    <el-button type="primary" @click="openUpload()">
+                        {{ $t('ssl.upload') }}
+                    </el-button>
+                    <el-button type="primary" plain @click="openCA()">
+                        {{ $t('ssl.selfSigned') }}
+                    </el-button>
+                    <el-button type="primary" plain @click="openAcmeAccount()">
+                        {{ $t('website.acmeAccountManage') }}
+                    </el-button>
+                    <el-button type="primary" plain @click="openDnsAccount()">
+                        {{ $t('website.dnsAccountManage') }}
+                    </el-button>
+                    <el-button plain @click="deleteSSL(null)" :disabled="selects.length === 0">
+                        {{ $t('commons.button.delete') }}
+                    </el-button>
+                </div>
             </template>
             <template #main>
                 <br />
@@ -43,13 +45,14 @@
                         fix
                         show-overflow-tooltip
                         prop="domains"
+                        min-width="150px"
                     ></el-table-column>
                     <el-table-column
                         :label="$t('ssl.applyType')"
                         fix
                         show-overflow-tooltip
                         prop="provider"
-                        width="100px"
+                        min-width="180px"
                     >
                         <template #default="{ row }">{{ getProvider(row.provider) }}</template>
                     </el-table-column>
@@ -58,6 +61,7 @@
                         fix
                         show-overflow-tooltip
                         prop="acmeAccount.email"
+                        min-width="180px"
                     ></el-table-column>
                     <el-table-column
                         :label="$t('commons.table.status')"
@@ -101,8 +105,9 @@
                         fix
                         show-overflow-tooltip
                         prop="organization"
+                        min-width="110px"
                     ></el-table-column>
-                    <el-table-column :label="$t('website.remark')" fix prop="description">
+                    <el-table-column :label="$t('website.remark')" fix prop="description" min-width="100px">
                         <template #default="{ row }">
                             <fu-read-write-switch>
                                 <template #read>
@@ -114,7 +119,7 @@
                             </fu-read-write-switch>
                         </template>
                     </el-table-column>
-                    <el-table-column :label="$t('ssl.autoRenew')" fix width="100px">
+                    <el-table-column :label="$t('ssl.autoRenew')" fix min-width="110px">
                         <template #default="{ row }">
                             <el-switch
                                 :disabled="row.provider === 'dnsManual' || row.provider === 'manual'"
@@ -128,21 +133,23 @@
                         :label="$t('website.expireDate')"
                         :formatter="dateFormat"
                         show-overflow-tooltip
+                        width="200px"
                     />
                     <fu-table-operations
                         :ellipsis="3"
                         :buttons="buttons"
                         :label="$t('commons.table.operate')"
                         :fixed="mobile ? false : 'right'"
+                        width="300px"
                         fix
                     />
                 </ComplexTable>
             </template>
-            <DnsAccount ref="dnsAccountRef"></DnsAccount>
-            <AcmeAccount ref="acmeAccountRef"></AcmeAccount>
-            <Create ref="sslCreateRef" @close="search()" @submit="openLog"></Create>
-            <Detail ref="detailRef"></Detail>
-            <SSLUpload ref="sslUploadRef" @close="search()"></SSLUpload>
+            <DnsAccount ref="dnsAccountRef" />
+            <AcmeAccount ref="acmeAccountRef" />
+            <Create ref="sslCreateRef" @close="search()" @submit="openLog" />
+            <Detail ref="detailRef" />
+            <SSLUpload ref="sslUploadRef" @close="search()" />
             <Apply ref="applyRef" @search="search" @submit="openLog" />
             <OpDialog ref="opRef" @search="search" @cancel="search" />
             <Log ref="logRef" @close="search()" />
@@ -189,12 +196,12 @@ const sslUploadRef = ref();
 const applyRef = ref();
 const logRef = ref();
 const caRef = ref();
-let selects = ref<any>([]);
 const obtainRef = ref();
+let selects = ref<any>([]);
 
 const routerButton = [
     {
-        label: i18n.global.t('website.ssl'),
+        label: i18n.global.t('website.ssl', 2),
         path: '/websites/ssl',
     },
 ];
@@ -232,6 +239,15 @@ const buttons = [
         },
         show: function (row: Website.SSLDTO) {
             return row.provider == 'manual';
+        },
+    },
+    {
+        label: i18n.global.t('commons.button.edit'),
+        click: function (row: Website.SSLDTO) {
+            onEdit(row);
+        },
+        show: function (row: Website.SSLDTO) {
+            return row.provider != 'manual';
         },
     },
     {
@@ -292,7 +308,7 @@ const updateDesc = (row: Website.SSLDTO, bulr: Function) => {
 
 const updateConfig = (row: Website.SSLDTO) => {
     loading.value = true;
-    UpdateSSL({ id: row.id, autoRenew: row.autoRenew, description: row.description })
+    UpdateSSL(row)
         .then(() => {
             MsgSuccess(i18n.global.t('commons.msg.updateSuccess'));
         })
@@ -308,8 +324,12 @@ const openDnsAccount = () => {
     dnsAccountRef.value.acceptParams();
 };
 const openSSL = () => {
-    sslCreateRef.value.acceptParams();
+    sslCreateRef.value.acceptParams('create');
 };
+const onEdit = (row: Website.SSL) => {
+    sslCreateRef.value.acceptParams('edit', row);
+};
+
 const openUpload = () => {
     sslUploadRef.value.acceptParams();
 };

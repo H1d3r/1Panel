@@ -8,12 +8,13 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/1Panel-dev/1Panel/backend/app/model"
 	"github.com/1Panel-dev/1Panel/backend/global"
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/pkg/errors"
 
 	"github.com/1Panel-dev/1Panel/backend/buserr"
@@ -134,7 +135,7 @@ func (r *Remote) Backup(info BackupInfo) error {
 	}
 	fileNameItem := info.TargetDir + "/" + strings.TrimSuffix(info.FileName, ".gz")
 	backupCommand := exec.Command("bash", "-c",
-		fmt.Sprintf("docker run --rm --net=host -i %s /bin/bash -c 'PGPASSWORD=%s pg_dump  -h %s -p %d --no-owner -Fc -U %s %s' > %s",
+		fmt.Sprintf("docker run --rm --net=host -i %s /bin/bash -c 'PGPASSWORD=\"%s\" pg_dump -h %s -p %d --no-owner -Fc -U %s %s' > %s",
 			imageTag, r.Password, r.Address, r.Port, r.User, info.Name, fileNameItem))
 	_ = backupCommand.Run()
 	b := make([]byte, 5)
@@ -177,7 +178,7 @@ func (r *Remote) Recover(info RecoverInfo) error {
 		}()
 	}
 	recoverCommand := exec.Command("bash", "-c",
-		fmt.Sprintf("docker run --rm --net=host -i %s /bin/bash -c 'PGPASSWORD=%s pg_restore -h %s -p %d --verbose --clean --no-privileges --no-owner -Fc -U %s -d %s --role=%s' < %s",
+		fmt.Sprintf("docker run --rm --net=host -i %s /bin/bash -c 'PGPASSWORD=\"%s\" pg_restore -h %s -p %d --verbose --clean --no-privileges --no-owner -Fc -U %s -d %s --role=%s' < %s",
 			imageTag, r.Password, r.Address, r.Port, r.User, info.Name, info.Username, fileName))
 	pipe, _ := recoverCommand.StdoutPipe()
 	stderrPipe, _ := recoverCommand.StderrPipe()
@@ -223,7 +224,7 @@ func (r *Remote) SyncDB() ([]SyncDBInfo, error) {
 		}
 		datas = append(datas, SyncDBInfo{Name: dbName, From: r.From, PostgresqlName: r.Database})
 	}
-	if ctx.Err() == context.DeadlineExceeded {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return nil, buserr.New(constant.ErrExecTimeOut)
 	}
 	return datas, nil
@@ -240,7 +241,7 @@ func (r *Remote) ExecSQL(command string, timeout uint) error {
 	if _, err := r.Client.ExecContext(ctx, command); err != nil {
 		return err
 	}
-	if ctx.Err() == context.DeadlineExceeded {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return buserr.New(constant.ErrExecTimeOut)
 	}
 
@@ -269,7 +270,8 @@ func loadImageTag() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	images, err := client.ImageList(context.Background(), types.ImageListOptions{})
+	defer client.Close()
+	images, err := client.ImageList(context.Background(), image.ListOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -295,11 +297,15 @@ func loadImageTag() (string, error) {
 		return itemTag, nil
 	}
 
-	itemTag = "postgres:16.1-alpine"
+	sort.Strings(versions)
+	if len(versions) != 0 {
+		itemTag = versions[len(versions)-1]
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	if _, err := client.ImagePull(ctx, itemTag, types.ImagePullOptions{}); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
+	if _, err := client.ImagePull(ctx, itemTag, image.PullOptions{}); err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return itemTag, buserr.New(constant.ErrPgImagePull)
 		}
 		global.LOG.Errorf("image %s pull failed, err: %v", itemTag, err)

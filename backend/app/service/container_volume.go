@@ -52,7 +52,7 @@ func (u *ContainerService) PageVolume(req dto.SearchWithPage) (int64, interface{
 		records = list.Volumes[start:end]
 	}
 
-	nyc, _ := time.LoadLocation(common.LoadTimeZone())
+	nyc, _ := time.LoadLocation(common.LoadTimeZoneByCmd())
 	for _, item := range records {
 		tag := make([]string, 0)
 		for _, val := range item.Labels {
@@ -82,6 +82,7 @@ func (u *ContainerService) ListVolume() ([]dto.Options, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer client.Close()
 	list, err := client.VolumeList(context.TODO(), volume.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -102,6 +103,7 @@ func (u *ContainerService) DeleteVolume(req dto.BatchDelete) error {
 	if err != nil {
 		return err
 	}
+	defer client.Close()
 	for _, id := range req.Names {
 		if err := client.VolumeRemove(context.TODO(), id, true); err != nil {
 			if strings.Contains(err.Error(), "volume is in use") {
@@ -117,6 +119,7 @@ func (u *ContainerService) CreateVolume(req dto.VolumeCreate) error {
 	if err != nil {
 		return err
 	}
+	defer client.Close()
 	arg := filters.NewArgs()
 	arg.Add("name", req.Name)
 	vos, _ := client.VolumeList(context.TODO(), volume.ListOptions{Filters: arg})

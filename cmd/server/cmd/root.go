@@ -13,11 +13,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func init() {}
+var language string
+
+func init() {
+	RootCmd.PersistentFlags().StringVarP(&language, "language", "l", "en", "Set the language")
+}
 
 var RootCmd = &cobra.Command{
-	Use:   "1panel",
-	Short: "1Panel ，一款现代化的 Linux 面板",
+	Use: "1panel",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		server.Start()
 		return nil
@@ -34,13 +37,13 @@ type setting struct {
 }
 
 func loadDBConn() (*gorm.DB, error) {
-	stdout, err := cmdUtils.Exec("grep '^BASE_DIR=' /usr/bin/1pctl | cut -d'=' -f2")
+	stdout, err := cmdUtils.Exec("grep '^BASE_DIR=' /usr/local/bin/1pctl | cut -d'=' -f2")
 	if err != nil {
 		return nil, fmt.Errorf("handle load `BASE_DIR` failed, err: %v", err)
 	}
 	baseDir := strings.ReplaceAll(stdout, "\n", "")
 	if len(baseDir) == 0 {
-		return nil, fmt.Errorf("error `BASE_DIR` find in /usr/bin/1pctl \n")
+		return nil, fmt.Errorf("error `BASE_DIR` find in /usr/local/bin/1pctl \n")
 	}
 	if strings.HasSuffix(baseDir, "/") {
 		baseDir = baseDir[:strings.LastIndex(baseDir, "/")]

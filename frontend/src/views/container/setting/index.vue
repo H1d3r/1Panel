@@ -2,40 +2,34 @@
     <div v-loading="loading">
         <div class="app-status" style="margin-top: 20px">
             <el-card>
-                <div>
-                    <el-tag style="float: left" effect="dark" type="success">Docker</el-tag>
-                    <el-tag round class="status-content" v-if="form.status === 'Running'" type="success">
-                        {{ $t('commons.status.running') }}
-                    </el-tag>
-                    <el-tag round class="status-content" v-if="form.status === 'Stopped'" type="info">
-                        {{ $t('commons.status.stopped') }}
-                    </el-tag>
-                    <el-tag class="status-content">{{ $t('app.version') }}: {{ form.version }}</el-tag>
-
-                    <span v-if="form.status === 'Running'" class="buttons">
-                        <el-button type="primary" @click="onOperator('stop')" link>
+                <div class="flex w-full flex-col gap-4 md:flex-row">
+                    <div class="flex flex-wrap gap-4">
+                        <el-tag style="float: left" effect="dark" type="success">Docker</el-tag>
+                        <el-tag round v-if="form.status === 'Running'" type="success">
+                            {{ $t('commons.status.running') }}
+                        </el-tag>
+                        <el-tag round v-if="form.status === 'Stopped'" type="info">
+                            {{ $t('commons.status.stopped') }}
+                        </el-tag>
+                        <el-tag>{{ $t('app.version') }}: {{ form.version }}</el-tag>
+                    </div>
+                    <div class="mt-0.5">
+                        <el-button type="primary" v-if="form.status === 'Running'" @click="onOperator('stop')" link>
                             {{ $t('container.stop') }}
                         </el-button>
-                        <el-divider direction="vertical" />
-                        <el-button type="primary" @click="onOperator('restart')" link>
-                            {{ $t('container.restart') }}
-                        </el-button>
-                    </span>
-
-                    <span v-if="form.status === 'Stopped'" class="buttons">
-                        <el-button type="primary" @click="onOperator('start')" link>
+                        <el-button type="primary" v-if="form.status === 'Stopped'" @click="onOperator('start')" link>
                             {{ $t('container.start') }}
                         </el-button>
                         <el-divider direction="vertical" />
                         <el-button type="primary" @click="onOperator('restart')" link>
                             {{ $t('container.restart') }}
                         </el-button>
-                    </span>
+                    </div>
                 </div>
             </el-card>
         </div>
 
-        <LayoutContent style="margin-top: 20px" :title="$t('container.setting')" :divider="true">
+        <LayoutContent style="margin-top: 20px" :title="$t('container.setting', 2)" :divider="true">
             <template #main>
                 <el-radio-group v-model="confShowType" @change="changeMode">
                     <el-radio-button value="base">{{ $t('database.baseConf') }}</el-radio-button>
@@ -44,17 +38,20 @@
                 <el-row style="margin-top: 20px" v-if="confShowType === 'base'">
                     <el-col :span="1"><br /></el-col>
                     <el-col :xs="24" :sm="24" :md="15" :lg="12" :xl="10">
-                        <el-form :model="form" label-position="left" :rules="rules" ref="formRef" label-width="120px">
+                        <el-form :model="form" label-position="left" :rules="rules" ref="formRef" label-width="auto">
                             <el-form-item :label="$t('container.mirrors')" prop="mirrors">
-                                <div style="width: 100%" v-if="form.mirrors">
+                                <div
+                                    class="flex w-full justify-start flex-col sm:flex-row sm:items-end"
+                                    v-if="form.mirrors"
+                                >
                                     <el-input
                                         type="textarea"
                                         :rows="5"
                                         disabled
                                         v-model="form.mirrors"
-                                        style="width: calc(100% - 80px)"
+                                        class="sm:calc(100% - 80px)"
                                     />
-                                    <el-button @click="onChangeMirrors" icon="Setting">
+                                    <el-button @click="onChangeMirrors" icon="Setting" class="custom-input-textarea">
                                         {{ $t('commons.button.set') }}
                                     </el-button>
                                 </div>
@@ -65,18 +62,19 @@
                                         </el-button>
                                     </template>
                                 </el-input>
-                                <span class="input-help">{{ $t('container.mirrorsHelper') }}</span>
-                                <span class="input-help flx-align-center" style="display: flex">
-                                    {{ $t('container.mirrorsHelper2') }}
-                                    <el-link
-                                        style="font-size: 12px; margin-left: 5px"
-                                        icon="Position"
-                                        @click="toDoc()"
-                                        type="primary"
-                                    >
-                                        {{ $t('firewall.quickJump') }}
-                                    </el-link>
-                                </span>
+                                <div class="flex">
+                                    <span>
+                                        {{ $t('container.mirrorsHelper') }} {{ $t('container.mirrorsHelper2') }}
+                                        <el-link
+                                            style="font-size: 12px; margin-left: 5px"
+                                            icon="Position"
+                                            @click="toDoc()"
+                                            type="primary"
+                                        >
+                                            {{ $t('firewall.quickJump') }}
+                                        </el-link>
+                                    </span>
+                                </div>
                             </el-form-item>
                             <el-form-item :label="$t('container.registries')" prop="registries">
                                 <div style="width: 100%" v-if="form.registries">
@@ -100,7 +98,7 @@
                                 </el-input>
                             </el-form-item>
 
-                            <el-form-item label="ipv6" prop="ipv6">
+                            <el-form-item label="IPv6" prop="ipv6">
                                 <el-switch v-model="form.ipv6" @change="handleIPv6"></el-switch>
                                 <span class="input-help"></span>
                                 <div v-if="ipv6OptionShow">
@@ -133,7 +131,7 @@
                                 <el-switch v-model="form.iptables" @change="handleIptables"></el-switch>
                                 <span class="input-help">{{ $t('container.iptablesHelper1') }}</span>
                             </el-form-item>
-                            <el-form-item label="live-restore" prop="liveRestore">
+                            <el-form-item label="Live restore" prop="liveRestore">
                                 <el-switch
                                     :disabled="form.isSwarm"
                                     v-model="form.liveRestore"
@@ -144,7 +142,7 @@
                                     {{ $t('container.liveWithSwarmHelper') }}
                                 </span>
                             </el-form-item>
-                            <el-form-item label="cgroup-driver" prop="cgroupDriver">
+                            <el-form-item label="cgroup driver" prop="cgroupDriver">
                                 <el-radio-group v-model="form.cgroupDriver" @change="handleCgroup">
                                     <el-radio value="cgroupfs">cgroupfs</el-radio>
                                     <el-radio value="systemd">systemd</el-radio>
@@ -438,7 +436,7 @@ const save = async (key: string, value: string) => {
 };
 
 const toDoc = () => {
-    window.open('https://1panel.cn/docs/user_manual/containers/setting/', '_blank', 'noopener,noreferrer');
+    window.open(globalStore.docsUrl + '/user_manual/containers/setting/', '_blank', 'noopener,noreferrer');
 };
 
 const onOperator = async (operation: string) => {

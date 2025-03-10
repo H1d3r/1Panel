@@ -76,7 +76,12 @@ const openUrl = (domain: Website.Domain) => {
         url = url + ':' + domain.port;
     }
     if (protocol == 'https') {
-        url = url + ':' + httpsPort.value;
+        if (httpsPort.value != 443) {
+            url = url + ':' + httpsPort.value;
+        }
+        if (domain.port != 80) {
+            url = 'http://' + domain.domain + ':' + domain.port;
+        }
     }
     window.open(url);
 };
@@ -87,7 +92,7 @@ const deleteDomain = async (row: Website.Domain) => {
         names: [row.domain],
         msg: i18n.global.t('commons.msg.operatorHelper', [
             i18n.global.t('website.domain'),
-            i18n.global.t('commons.msg.delete'),
+            i18n.global.t('commons.button.delete'),
         ]),
         api: DeleteDomain,
         params: { id: row.id },

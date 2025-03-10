@@ -1,10 +1,13 @@
 <template>
-    <el-drawer v-model="open" :close-on-click-modal="false" size="40%" :before-close="handleClose">
+    <el-drawer
+        v-model="open"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+        size="40%"
+        :before-close="handleClose"
+    >
         <template #header>
-            <DrawerHeader
-                :header="$t('commons.button.' + redirect.operate) + $t('website.redirect')"
-                :back="handleClose"
-            />
+            <DrawerHeader :header="$t('commons.button.' + redirect.operate)" :back="handleClose" />
         </template>
         <el-row v-loading="loading">
             <el-col :span="22" :offset="1">

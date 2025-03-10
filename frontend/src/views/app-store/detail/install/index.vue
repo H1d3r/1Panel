@@ -1,6 +1,7 @@
 <template>
     <el-drawer
         :close-on-click-modal="false"
+        :close-on-press-escape="false"
         v-model="open"
         :title="$t('app.install')"
         size="50%"
@@ -15,7 +16,7 @@
                     :title="$t('app.appInstallWarn')"
                     class="common-prompt"
                     :closable="false"
-                    type="error"
+                    type="warning"
                     v-if="!isHostMode"
                 />
                 <el-alert
@@ -107,9 +108,13 @@
                             <el-checkbox v-model="req.editCompose" :label="$t('app.editCompose')" size="large" />
                             <span class="input-help">{{ $t('app.editComposeHelper') }}</span>
                         </el-form-item>
+                        <el-form-item pro="gpuConfig" v-if="gpuSupport">
+                            <el-checkbox v-model="req.gpuConfig" :label="$t('app.gpuConfig')" size="large" />
+                            <span class="input-help">{{ $t('app.gpuConfigHelper') }}</span>
+                        </el-form-item>
                         <el-form-item pro="pullImage">
-                            <el-checkbox v-model="req.pullImage" :label="$t('container.forcePull')" size="large" />
-                            <span class="input-help">{{ $t('container.forcePullHelper') }}</span>
+                            <el-checkbox v-model="req.pullImage" :label="$t('app.pullImage')" size="large" />
+                            <span class="input-help">{{ $t('app.pullImageHelper') }}</span>
                         </el-form-item>
                         <div v-if="req.editCompose">
                             <codemirror
@@ -152,22 +157,22 @@ import { useRouter } from 'vue-router';
 import Params from '../params/index.vue';
 import Header from '@/components/drawer-header/index.vue';
 import { Codemirror } from 'vue-codemirror';
-import { javascript } from '@codemirror/lang-javascript';
+import { yaml } from '@codemirror/lang-yaml';
 import { oneDark } from '@codemirror/theme-one-dark';
 import i18n from '@/lang';
 import { MsgError } from '@/utils/message';
 import { Container } from '@/api/interface/container';
 import { loadResourceLimit } from '@/api/modules/container';
 
-const extensions = [javascript(), oneDark];
+const extensions = [yaml(), oneDark];
 const router = useRouter();
 
-interface InstallRrops {
+interface InstallProps {
     params?: App.AppParams;
     app: any;
 }
 
-const installData = ref<InstallRrops>({
+const installData = ref<InstallProps>({
     app: {},
 });
 const open = ref(false);
@@ -197,6 +202,7 @@ const initData = () => ({
     version: '',
     appID: '',
     pullImage: true,
+    gpuConfig: false,
 });
 const req = reactive(initData());
 const limits = ref<Container.ResourceLimit>({
@@ -214,6 +220,7 @@ const handleClose = () => {
 };
 const paramKey = ref(1);
 const isHostMode = ref(false);
+const gpuSupport = ref(false);
 
 const changeUnit = () => {
     if (req.memoryUnit == 'M') {
@@ -232,7 +239,7 @@ const resetForm = () => {
     Object.assign(req, initData());
 };
 
-const acceptParams = async (props: InstallRrops) => {
+const acceptParams = async (props: InstallProps) => {
     resetForm();
     if (props.app.versions != undefined) {
         installData.value = props;
@@ -261,6 +268,7 @@ const getAppDetail = async (version: string) => {
         isHostMode.value = res.data.hostMode;
         installData.value.params = res.data.params;
         paramKey.value++;
+        gpuSupport.value = res.data.gpuSupport;
     } catch (error) {
     } finally {
         loading.value = false;

@@ -2,17 +2,24 @@ package service
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/1Panel-dev/1Panel/backend/app/dto/request"
 	"github.com/1Panel-dev/1Panel/backend/app/dto/response"
 	"github.com/1Panel-dev/1Panel/backend/buserr"
 	"github.com/1Panel-dev/1Panel/backend/constant"
+	"golang.org/x/net/html/charset"
+	"golang.org/x/sys/unix"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 
 	"github.com/1Panel-dev/1Panel/backend/global"
 	"github.com/1Panel-dev/1Panel/backend/utils/common"
@@ -43,6 +50,11 @@ type IFileService interface {
 	ChangeMode(op request.FileCreate) error
 	BatchChangeModeAndOwner(op request.FileRoleReq) error
 	ReadLogByLine(req request.FileReadByLineReq) (*response.FileLineContent, error)
+	BatchCheckFiles(req request.FilePathsCheck) []response.ExistFileInfo
+}
+
+var filteredPaths = []string{
+	"/.1panel_clash",
 }
 
 func NewIFileService() IFileService {
@@ -51,8 +63,12 @@ func NewIFileService() IFileService {
 
 func (f *FileService) GetFileList(op request.FileOption) (response.FileInfo, error) {
 	var fileInfo response.FileInfo
-	if _, err := os.Stat(op.Path); err != nil && os.IsNotExist(err) {
+	data, err := os.Stat(op.Path)
+	if err != nil && os.IsNotExist(err) {
 		return fileInfo, nil
+	}
+	if !data.IsDir() {
+		op.FileOption.Path = filepath.Dir(op.FileOption.Path)
 	}
 	info, err := files.NewFileInfo(op.FileOption)
 	if err != nil {
@@ -73,7 +89,7 @@ func (f *FileService) SearchUploadWithPage(req request.SearchUploadWithPage) (in
 		}
 		if !info.IsDir() {
 			files = append(files, response.UploadInfo{
-				CreatedAt: info.ModTime().Format("2006-01-02 15:04:05"),
+				CreatedAt: info.ModTime().Format(constant.DateTimeLayout),
 				Size:      int(info.Size()),
 				Name:      info.Name(),
 			})
@@ -94,25 +110,76 @@ func (f *FileService) SearchUploadWithPage(req request.SearchUploadWithPage) (in
 
 func (f *FileService) GetFileTree(op request.FileOption) ([]response.FileTree, error) {
 	var treeArray []response.FileTree
+	if _, err := os.Stat(op.Path); err != nil && os.IsNotExist(err) {
+		return treeArray, nil
+	}
 	info, err := files.NewFileInfo(op.FileOption)
 	if err != nil {
 		return nil, err
 	}
 	node := response.FileTree{
-		ID:   common.GetUuid(),
-		Name: info.Name,
-		Path: info.Path,
+		ID:        common.GetUuid(),
+		Name:      info.Name,
+		Path:      info.Path,
+		IsDir:     info.IsDir,
+		Extension: info.Extension,
 	}
-	for _, v := range info.Items {
-		if v.IsDir {
-			node.Children = append(node.Children, response.FileTree{
-				ID:   common.GetUuid(),
-				Name: v.Name,
-				Path: v.Path,
-			})
-		}
+	err = f.buildFileTree(&node, info.Items, op, 2)
+	if err != nil {
+		return nil, err
 	}
 	return append(treeArray, node), nil
+}
+
+func shouldFilterPath(path string) bool {
+	cleanedPath := filepath.Clean(path)
+	for _, filteredPath := range filteredPaths {
+		cleanedFilteredPath := filepath.Clean(filteredPath)
+		if cleanedFilteredPath == cleanedPath || strings.HasPrefix(cleanedPath, cleanedFilteredPath+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// 递归构建文件树(只取当前目录以及当前目录下的第一层子节点)
+func (f *FileService) buildFileTree(node *response.FileTree, items []*files.FileInfo, op request.FileOption, level int) error {
+	for _, v := range items {
+		if shouldFilterPath(v.Path) {
+			global.LOG.Infof("File Tree: Skipping %s due to filter\n", v.Path)
+			continue
+		}
+		childNode := response.FileTree{
+			ID:        common.GetUuid(),
+			Name:      v.Name,
+			Path:      v.Path,
+			IsDir:     v.IsDir,
+			Extension: v.Extension,
+		}
+		if level > 1 && v.IsDir {
+			if err := f.buildChildNode(&childNode, v, op, level); err != nil {
+				return err
+			}
+		}
+
+		node.Children = append(node.Children, childNode)
+	}
+	return nil
+}
+
+func (f *FileService) buildChildNode(childNode *response.FileTree, fileInfo *files.FileInfo, op request.FileOption, level int) error {
+	op.Path = fileInfo.Path
+	subInfo, err := files.NewFileInfo(op.FileOption)
+	if err != nil {
+		if os.IsPermission(err) || errors.Is(err, unix.EACCES) {
+			global.LOG.Infof("File Tree: Skipping %s due to permission denied\n", fileInfo.Path)
+			return nil
+		}
+		global.LOG.Errorf("File Tree: Skipping %s due to error: %s\n", fileInfo.Path, err.Error())
+		return nil
+	}
+
+	return f.buildFileTree(childNode, subInfo.Items, op, level-1)
 }
 
 func (f *FileService) Create(op request.FileCreate) error {
@@ -121,7 +188,7 @@ func (f *FileService) Create(op request.FileCreate) error {
 	}
 	fo := files.NewFileOp()
 	if fo.Stat(op.Path) {
-		return buserr.New(constant.ErrFileIsExit)
+		return buserr.New(constant.ErrFileIsExist)
 	}
 	mode := op.Mode
 	if mode == 0 {
@@ -145,6 +212,12 @@ func (f *FileService) Create(op request.FileCreate) error {
 }
 
 func (f *FileService) Delete(op request.FileDelete) error {
+	if op.IsDir {
+		excludeDir := global.CONF.System.DataDir
+		if filepath.Base(op.Path) == ".1panel_clash" || op.Path == excludeDir {
+			return buserr.New(constant.ErrPathNotDelete)
+		}
+	}
 	fo := files.NewFileOp()
 	recycleBinStatus, _ := settingRepo.Get(settingRepo.WithByKey("FileRecycleBin"))
 	if recycleBinStatus.Value == "disable" {
@@ -211,23 +284,44 @@ func (f *FileService) ChangeOwner(req request.FileRoleUpdate) error {
 func (f *FileService) Compress(c request.FileCompress) error {
 	fo := files.NewFileOp()
 	if !c.Replace && fo.Stat(filepath.Join(c.Dst, c.Name)) {
-		return buserr.New(constant.ErrFileIsExit)
+		return buserr.New(constant.ErrFileIsExist)
 	}
-	return fo.Compress(c.Files, c.Dst, c.Name, files.CompressType(c.Type))
+	return fo.Compress(c.Files, c.Dst, c.Name, files.CompressType(c.Type), c.Secret)
 }
 
 func (f *FileService) DeCompress(c request.FileDeCompress) error {
 	fo := files.NewFileOp()
-	return fo.Decompress(c.Path, c.Dst, files.CompressType(c.Type))
+	if c.Type == "tar" && len(c.Secret) != 0 {
+		c.Type = "tar.gz"
+	}
+	return fo.Decompress(c.Path, c.Dst, files.CompressType(c.Type), c.Secret)
 }
 
 func (f *FileService) GetContent(op request.FileContentReq) (response.FileInfo, error) {
 	info, err := files.NewFileInfo(files.FileOption{
-		Path:   op.Path,
-		Expand: true,
+		Path:     op.Path,
+		Expand:   true,
+		IsDetail: op.IsDetail,
 	})
 	if err != nil {
 		return response.FileInfo{}, err
+	}
+
+	content := []byte(info.Content)
+	if len(content) > 1024 {
+		content = content[:1024]
+	}
+	if !utf8.Valid(content) {
+		_, decodeName, _ := charset.DetermineEncoding(content, "")
+		if decodeName == "windows-1252" {
+			reader := strings.NewReader(info.Content)
+			item := transform.NewReader(reader, simplifiedchinese.GBK.NewDecoder())
+			contents, err := io.ReadAll(item)
+			if err != nil {
+				return response.FileInfo{}, err
+			}
+			info.Content = string(contents)
+		}
 	}
 	return response.FileInfo{FileInfo: *info}, nil
 }
@@ -303,7 +397,7 @@ func (f *FileService) FileDownload(d request.FileDownload) (string, error) {
 			return "", err
 		}
 		fo := files.NewFileOp()
-		if err := fo.Compress(d.Paths, tempPath, d.Name, files.CompressType(d.Type)); err != nil {
+		if err := fo.Compress(d.Paths, tempPath, d.Name, files.CompressType(d.Type), ""); err != nil {
 			return "", err
 		}
 		filePath = filepath.Join(tempPath, d.Name)
@@ -312,12 +406,32 @@ func (f *FileService) FileDownload(d request.FileDownload) (string, error) {
 }
 
 func (f *FileService) DirSize(req request.DirSizeReq) (response.DirSizeRes, error) {
+	var (
+		res response.DirSizeRes
+	)
+	if req.Path == "/proc" {
+		return res, nil
+	}
+	cmd := exec.Command("du", "-s", req.Path)
+	output, err := cmd.Output()
+	if err == nil {
+		fields := strings.Fields(string(output))
+		if len(fields) == 2 {
+			var cmdSize int64
+			_, err = fmt.Sscanf(fields[0], "%d", &cmdSize)
+			if err == nil {
+				res.Size = float64(cmdSize * 1024)
+				return res, nil
+			}
+		}
+	}
 	fo := files.NewFileOp()
 	size, err := fo.GetDirSize(req.Path)
 	if err != nil {
-		return response.DirSizeRes{}, err
+		return res, err
 	}
-	return response.DirSizeRes{Size: size}, nil
+	res.Size = size
+	return res, nil
 }
 
 func (f *FileService) ReadLogByLine(req request.FileReadByLineReq) (*response.FileLineContent, error) {
@@ -365,16 +479,47 @@ func (f *FileService) ReadLogByLine(req request.FileReadByLineReq) (*response.Fi
 		}
 	case "image-pull", "image-push", "image-build", "compose-create":
 		logFilePath = path.Join(global.CONF.System.TmpDir, fmt.Sprintf("docker_logs/%s", req.Name))
+	case "ollama-model":
+		logFilePath = path.Join(global.CONF.System.DataDir, "log", "AITools", req.Name)
+	case "mysql-slow-logs":
+		logFilePath = path.Join(global.CONF.System.DataDir, fmt.Sprintf("apps/mysql/%s/data/1Panel-slow.log", req.Name))
+	case "mariadb-slow-logs":
+		logFilePath = path.Join(global.CONF.System.DataDir, fmt.Sprintf("apps/mariadb/%s/db/data/1Panel-slow.log", req.Name))
 	}
 
-	lines, isEndOfFile, err := files.ReadFileByLine(logFilePath, req.Page, req.PageSize)
+	lines, isEndOfFile, total, err := files.ReadFileByLine(logFilePath, req.Page, req.PageSize, req.Latest)
 	if err != nil {
 		return nil, err
 	}
+	if req.Latest && req.Page == 1 && len(lines) < 1000 && total > 1 {
+		preLines, _, _, err := files.ReadFileByLine(logFilePath, total-1, req.PageSize, false)
+		if err != nil {
+			return nil, err
+		}
+		lines = append(preLines, lines...)
+	}
+
 	res := &response.FileLineContent{
 		Content: strings.Join(lines, "\n"),
 		End:     isEndOfFile,
 		Path:    logFilePath,
+		Total:   total,
+		Lines:   lines,
 	}
 	return res, nil
+}
+
+func (f *FileService) BatchCheckFiles(req request.FilePathsCheck) []response.ExistFileInfo {
+	fileList := make([]response.ExistFileInfo, 0, len(req.Paths))
+	for _, filePath := range req.Paths {
+		if info, err := os.Stat(filePath); err == nil {
+			fileList = append(fileList, response.ExistFileInfo{
+				Size:    float64(info.Size()),
+				Name:    info.Name(),
+				Path:    filePath,
+				ModTime: info.ModTime(),
+			})
+		}
+	}
+	return fileList
 }

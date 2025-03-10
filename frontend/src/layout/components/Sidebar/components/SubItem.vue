@@ -5,7 +5,7 @@
                 <el-icon>
                     <SvgIcon :iconName="(subItem.meta?.icon as string)" />
                 </el-icon>
-                <span>{{ $t(subItem.meta?.title as string) }}</span>
+                <span>{{ $t(subItem.meta?.title as string, 2) }}</span>
             </template>
             <SubItem :menuList="subItem.children" />
         </el-sub-menu>
@@ -15,7 +15,7 @@
                 <SvgIcon :iconName="(subItem.meta?.icon as string)" />
             </el-icon>
             <template #title>
-                <span>{{ $t(subItem.meta?.title as string) }}</span>
+                <span>{{ $t(subItem.meta?.title as string, 2) }}</span>
             </template>
         </el-menu-item>
 
@@ -24,8 +24,8 @@
                 <SvgIcon :iconName="(subItem.meta?.icon as string)" />
             </el-icon>
             <template #title>
-                <span v-if="subItem.meta?.icon">{{ $t(subItem.meta?.title as string) }}</span>
-                <span v-else style="margin-left: 10px">{{ $t(subItem.meta?.title as string) }}</span>
+                <span v-if="subItem.meta?.icon">{{ $t(subItem.meta?.title as string, 2) }}</span>
+                <span v-else style="margin-left: 10px">{{ $t(subItem.meta?.title as string, 2) }}</span>
             </template>
         </el-menu-item>
     </template>
@@ -39,5 +39,5 @@ defineProps<{ menuList: RouteRecordRaw[] }>();
 </script>
 
 <style scoped lang="scss">
-@import '../index.scss';
+@use '../index';
 </style>

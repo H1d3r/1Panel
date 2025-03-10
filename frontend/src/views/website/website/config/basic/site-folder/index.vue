@@ -7,8 +7,8 @@
                 </el-form-item>
                 <el-form-item :label="$t('website.primaryPath')">
                     <el-space wrap>
-                        {{ website.sitePath }}
-                        <el-button type="primary" link @click="toFolder(website.sitePath)">
+                        {{ website.sitePath + '/index' }}
+                        <el-button type="primary" link @click="toFolder(website.sitePath + '/index')">
                             <el-icon>
                                 <FolderOpened />
                             </el-icon>
@@ -20,7 +20,7 @@
                 </el-form-item>
                 <el-form-item v-if="configDir" :label="$t('website.runDir')">
                     <el-space wrap>
-                        <el-select v-model="update.siteDir" class="p-w-200">
+                        <el-select v-model="update.siteDir" filterable class="p-w-200">
                             <el-option
                                 v-for="(item, index) in dirs"
                                 :label="item"
@@ -50,19 +50,11 @@
                     </el-space>
                 </el-form-item>
             </el-form>
-            <el-alert :closable="false" v-if="configDir">
-                <template #default>
-                    <span class="warnHelper">{{ $t('website.runUserHelper') }}</span>
-                </template>
-            </el-alert>
-            <el-alert :closable="false" type="error" v-if="dirConfig.msg != ''">
-                <template #default>
-                    <span class="warnHelper">{{ dirConfig.msg }}</span>
-                </template>
-            </el-alert>
+            <el-text type="warning" v-if="configDir">{{ $t('website.runUserHelper') }}</el-text>
+            <br />
+            <el-text type="danger" v-if="dirConfig.msg != ''">{{ dirConfig.msg }}</el-text>
             <br />
             <el-descriptions :title="$t('website.folderTitle')" :column="1" border>
-                <el-descriptions-item label="waf">{{ $t('website.wafFolder') }}</el-descriptions-item>
                 <el-descriptions-item label="ssl">{{ $t('website.sslFolder') }}</el-descriptions-item>
                 <el-descriptions-item label="log">{{ $t('website.logFolder') }}</el-descriptions-item>
                 <el-descriptions-item label="index">{{ $t('website.indexFolder') }}</el-descriptions-item>
@@ -169,10 +161,17 @@ const initData = () => {
     dirs.value = [];
 };
 
+function filterDirectories(directories: any[]) {
+    return directories.filter((dir) => {
+        return dir !== '/node_modules' && dir !== '/vendor';
+    });
+}
+
 const getDirConfig = async () => {
     try {
         const res = await GetDirConfig({ id: props.id });
         dirs.value = res.data.dirs;
+        dirs.value = filterDirectories(dirs.value);
         dirConfig.value = res.data;
     } catch (error) {}
 };

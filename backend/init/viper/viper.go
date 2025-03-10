@@ -3,6 +3,7 @@ package viper
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"path"
 	"strings"
 
@@ -21,7 +22,7 @@ func Init() {
 	port := "9999"
 	mode := ""
 	version := "v1.0.0"
-	username, password, entrance := "", "", ""
+	username, password, entrance, language := "", "", "", "zh"
 	fileOp := files.NewFileOp()
 	v := viper.NewWithOptions()
 	v.SetConfigType("yaml")
@@ -46,6 +47,7 @@ func Init() {
 		username = loadParams("ORIGINAL_USERNAME")
 		password = loadParams("ORIGINAL_PASSWORD")
 		entrance = loadParams("ORIGINAL_ENTRANCE")
+		language = loadParams("LANGUAGE")
 
 		reader := bytes.NewReader(conf.AppYaml)
 		if err := v.ReadConfig(reader); err != nil {
@@ -80,11 +82,15 @@ func Init() {
 		if serverConfig.System.Entrance != "" {
 			entrance = serverConfig.System.Entrance
 		}
+		if serverConfig.System.IsIntl {
+			language = "en"
+		}
 	}
 
 	global.CONF = serverConfig
 	global.CONF.System.BaseDir = baseDir
 	global.CONF.System.IsDemo = v.GetBool("system.is_demo")
+	global.CONF.System.IsIntl = v.GetBool("system.is_intl")
 	global.CONF.System.DataDir = path.Join(global.CONF.System.BaseDir, "1panel")
 	global.CONF.System.Cache = path.Join(global.CONF.System.DataDir, "cache")
 	global.CONF.System.Backup = path.Join(global.CONF.System.DataDir, "backup")
@@ -96,24 +102,26 @@ func Init() {
 	global.CONF.System.Username = username
 	global.CONF.System.Password = password
 	global.CONF.System.Entrance = entrance
+	global.CONF.System.Language = language
 	global.CONF.System.ChangeUserInfo = loadChangeInfo()
+	global.CONF.System.LicenseVerify = os.Getenv("LXWARE_LICENSE_VERIFY")
 	global.Viper = v
 }
 
 func loadParams(param string) string {
-	stdout, err := cmd.Execf("grep '^%s=' /usr/bin/1pctl | cut -d'=' -f2", param)
+	stdout, err := cmd.Execf("grep '^%s=' /usr/local/bin/1pctl | cut -d'=' -f2", param)
 	if err != nil {
 		panic(err)
 	}
 	info := strings.ReplaceAll(stdout, "\n", "")
 	if len(info) == 0 || info == `""` {
-		panic(fmt.Sprintf("error `%s` find in /usr/bin/1pctl", param))
+		panic(fmt.Sprintf("error `%s` find in /usr/local/bin/1pctl", param))
 	}
 	return info
 }
 
 func loadChangeInfo() string {
-	stdout, err := cmd.Exec("grep '^CHANGE_USER_INFO=' /usr/bin/1pctl | cut -d'=' -f2")
+	stdout, err := cmd.Exec("grep '^CHANGE_USER_INFO=' /usr/local/bin/1pctl | cut -d'=' -f2")
 	if err != nil {
 		return ""
 	}

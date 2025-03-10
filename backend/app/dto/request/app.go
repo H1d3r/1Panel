@@ -33,6 +33,7 @@ type AppContainerConfig struct {
 	DockerCompose string  `json:"dockerCompose"`
 	HostMode      bool    `json:"hostMode"`
 	PullImage     bool    `json:"pullImage"`
+	GpuConfig     bool    `json:"gpuConfig"`
 }
 
 type AppInstalledSearch struct {
@@ -43,6 +44,7 @@ type AppInstalledSearch struct {
 	Update bool     `json:"update"`
 	Unused bool     `json:"unused"`
 	All    bool     `json:"all"`
+	Sync   bool     `json:"sync"`
 }
 
 type AppInstalledInfo struct {
@@ -60,15 +62,24 @@ type AppBackupDelete struct {
 }
 
 type AppInstalledOperate struct {
-	InstallId    uint                `json:"installId" validate:"required"`
-	BackupId     uint                `json:"backupId"`
-	DetailId     uint                `json:"detailId"`
-	Operate      constant.AppOperate `json:"operate" validate:"required"`
-	ForceDelete  bool                `json:"forceDelete"`
-	DeleteBackup bool                `json:"deleteBackup"`
-	DeleteDB     bool                `json:"deleteDB"`
-	Backup       bool                `json:"backup"`
-	PullImage    bool                `json:"pullImage"`
+	InstallId     uint                `json:"installId" validate:"required"`
+	BackupId      uint                `json:"backupId"`
+	DetailId      uint                `json:"detailId"`
+	Operate       constant.AppOperate `json:"operate" validate:"required"`
+	ForceDelete   bool                `json:"forceDelete"`
+	DeleteBackup  bool                `json:"deleteBackup"`
+	DeleteDB      bool                `json:"deleteDB"`
+	Backup        bool                `json:"backup"`
+	PullImage     bool                `json:"pullImage"`
+	DockerCompose string              `json:"dockerCompose"`
+}
+
+type AppInstallUpgrade struct {
+	InstallID     uint   `json:"installId"`
+	DetailID      uint   `json:"detailId"`
+	Backup        bool   `json:"backup"`
+	PullImage     bool   `json:"pullImage"`
+	DockerCompose string `json:"dockerCompose"`
 }
 
 type AppInstalledUpdate struct {
@@ -86,4 +97,9 @@ type PortUpdate struct {
 	Key  string `json:"key"`
 	Name string `json:"name"`
 	Port int64  `json:"port"`
+}
+
+type AppUpdateVersion struct {
+	AppInstallID  uint   `json:"appInstallID" validate:"required"`
+	UpdateVersion string `json:"updateVersion"`
 }

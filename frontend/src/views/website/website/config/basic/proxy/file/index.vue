@@ -1,7 +1,13 @@
 <template>
-    <el-drawer v-model="open" :close-on-click-modal="false" size="40%" :before-close="handleClose">
+    <el-drawer
+        v-model="open"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+        :size="size"
+        :before-close="handleClose"
+    >
         <template #header>
-            <DrawerHeader :header="$t('website.proxyFile')" :back="handleClose" />
+            <DrawerHeader :header="$t('website.sourceFile')" :back="handleClose" />
         </template>
         <el-row v-loading="loading">
             <el-col :span="22" :offset="1">
@@ -35,13 +41,19 @@
 import DrawerHeader from '@/components/drawer-header/index.vue';
 import i18n from '@/lang';
 import { FormInstance } from 'element-plus';
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { MsgSuccess } from '@/utils/message';
 import { Codemirror } from 'vue-codemirror';
 import { UpdateProxyConfigFile } from '@/api/modules/website';
 import { StreamLanguage } from '@codemirror/language';
 import { nginx } from '@codemirror/legacy-modes/mode/nginx';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { GlobalStore } from '@/store';
+const globalStore = GlobalStore();
+
+const mobile = computed(() => {
+    return globalStore.isMobile();
+});
 
 const extensions = [StreamLanguage.define(nginx), oneDark];
 const proxyForm = ref<FormInstance>();
@@ -58,12 +70,17 @@ const req = reactive({
     websiteID: 0,
     content: '',
 });
+const size = ref('50%');
 
 const acceptParams = async (proxyreq: any) => {
     req.name = proxyreq.name;
     req.websiteID = proxyreq.websiteID;
     req.content = proxyreq.content;
     open.value = true;
+
+    if (mobile.value) {
+        size.value = '100%';
+    }
 };
 
 const submit = async () => {

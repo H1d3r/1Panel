@@ -4,11 +4,12 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"github.com/1Panel-dev/1Panel/backend/buserr"
 	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/1Panel-dev/1Panel/backend/buserr"
 )
 
 func GetHttpRes(url string) (*http.Response, error) {
