@@ -1,8 +1,14 @@
 <template>
-    <el-drawer v-model="drawerVisible" :destroy-on-close="true" :close-on-click-modal="false" size="30%">
+    <el-drawer
+        v-model="drawerVisible"
+        :destroy-on-close="true"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+        size="30%"
+    >
         <template #header>
             <DrawerHeader
-                :header="title + $t('container.repo')"
+                :header="title + $t('container.repo').toLowerCase()"
                 :resource="dialogData.rowData?.name"
                 :back="handleClose"
             />
@@ -75,6 +81,8 @@
             </span>
         </template>
     </el-drawer>
+
+    <ConfirmDialog ref="confirmDialog" @confirm="submit" />
 </template>
 
 <script lang="ts" setup>
@@ -99,8 +107,14 @@ const drawerVisible = ref(false);
 const dialogData = ref<DialogProps>({
     title: '',
 });
+const confirmDialog = ref();
+const oldUrl = ref();
+const oldProto = ref();
+
 const acceptParams = (params: DialogProps): void => {
     dialogData.value = params;
+    oldUrl.value = params.rowData.downloadUrl;
+    oldProto.value = params.rowData.protocol;
     title.value = i18n.global.t('commons.button.' + dialogData.value.title);
     drawerVisible.value = true;
 };
@@ -108,10 +122,11 @@ const emit = defineEmits<{ (e: 'search'): void }>();
 
 const handleClose = () => {
     drawerVisible.value = false;
+    emit('search');
 };
 const rules = reactive({
     name: [Rules.requiredInput, Rules.name],
-    downloadUrl: [Rules.illegal],
+    downloadUrl: [{ validator: validateDownloadUrl, trigger: 'blur' }, Rules.illegal],
     protocol: [Rules.requiredSelect],
     username: [Rules.illegal],
     password: [Rules.illegal],
@@ -121,25 +136,48 @@ const rules = reactive({
 type FormInstance = InstanceType<typeof ElForm>;
 const formRef = ref<FormInstance>();
 
+function validateDownloadUrl(rule: any, value: any, callback: any) {
+    if (value === '') {
+        callback();
+    }
+    const pattern = /^(http:\/\/|https:\/\/)/i;
+    if (pattern.test(value)) {
+        return callback(new Error(i18n.global.t('container.urlWarning')));
+    }
+    callback();
+}
+
 const onSubmit = async (formEl: FormInstance | undefined) => {
     if (!formEl) return;
     formEl.validate(async (valid) => {
         if (!valid) return;
-        loading.value = true;
-        if (dialogData.value.title === 'add') {
-            await createImageRepo(dialogData.value.rowData!)
-                .then(() => {
-                    loading.value = false;
-                    MsgSuccess(i18n.global.t('commons.msg.operationSuccess'));
-                    emit('search');
-                    drawerVisible.value = false;
-                })
-                .catch(() => {
-                    loading.value = false;
-                });
+        let newProto = dialogData.value.rowData.protocol;
+        if (newProto === 'https' && dialogData.value.title === 'add') {
+            submit();
             return;
         }
-        await updateImageRepo(dialogData.value.rowData!)
+        if (newProto === oldProto.value) {
+            if (
+                (oldProto.value === 'http' && dialogData.value.rowData.downloadUrl === oldUrl.value) ||
+                oldProto.value === 'https'
+            ) {
+                submit();
+                return;
+            }
+        }
+        let params = {
+            header: i18n.global.t('container.repo'),
+            operationInfo: i18n.global.t('container.httpRepoHelper'),
+            submitInputInfo: i18n.global.t('database.restartNow'),
+        };
+        confirmDialog.value!.acceptParams(params);
+    });
+};
+
+const submit = async () => {
+    loading.value = true;
+    if (dialogData.value.title === 'add') {
+        await createImageRepo(dialogData.value.rowData!)
             .then(() => {
                 loading.value = false;
                 MsgSuccess(i18n.global.t('commons.msg.operationSuccess'));
@@ -149,9 +187,19 @@ const onSubmit = async (formEl: FormInstance | undefined) => {
             .catch(() => {
                 loading.value = false;
             });
-    });
+        return;
+    }
+    await updateImageRepo(dialogData.value.rowData!)
+        .then(() => {
+            loading.value = false;
+            MsgSuccess(i18n.global.t('commons.msg.operationSuccess'));
+            emit('search');
+            drawerVisible.value = false;
+        })
+        .catch(() => {
+            loading.value = false;
+        });
 };
-
 defineExpose({
     acceptParams,
 });

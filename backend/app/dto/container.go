@@ -1,13 +1,15 @@
 package dto
 
-import "time"
+import (
+	"time"
+)
 
 type PageContainer struct {
 	PageInfo
 	Name            string `json:"name"`
 	State           string `json:"state" validate:"required,oneof=all created running paused restarting removing exited dead"`
-	OrderBy         string `json:"orderBy"`
-	Order           string `json:"order"`
+	OrderBy         string `json:"orderBy" validate:"required,oneof=name state created_at"`
+	Order           string `json:"order" validate:"required,oneof=null ascending descending"`
 	Filters         string `json:"filters"`
 	ExcludeAppStore bool   `json:"excludeAppStore"`
 }
@@ -114,7 +116,7 @@ type PortHelper struct {
 
 type ContainerOperation struct {
 	Names     []string `json:"names" validate:"required"`
-	Operation string   `json:"operation" validate:"required,oneof=start stop restart kill pause unpause remove"`
+	Operation string   `json:"operation" validate:"required,oneof=up start stop restart kill pause unpause remove"`
 }
 
 type ContainerRename struct {
@@ -122,8 +124,17 @@ type ContainerRename struct {
 	NewName string `json:"newName" validate:"required"`
 }
 
+type ContainerCommit struct {
+	ContainerId   string `json:"containerID" validate:"required"`
+	ContainerName string `json:"containerName"`
+	NewImageName  string `json:"newImageName"`
+	Comment       string `json:"comment"`
+	Author        string `json:"author"`
+	Pause         bool   `json:"pause"`
+}
+
 type ContainerPrune struct {
-	PruneType  string `json:"pruneType" validate:"required,oneof=container image volume network"`
+	PruneType  string `json:"pruneType" validate:"required,oneof=container image volume network buildcache"`
 	WithTagAll bool   `json:"withTagAll"`
 }
 
@@ -189,6 +200,7 @@ type ComposeInfo struct {
 	Workdir         string             `json:"workdir"`
 	Path            string             `json:"path"`
 	Containers      []ComposeContainer `json:"containers"`
+	Env             []string           `json:"env"`
 }
 type ComposeContainer struct {
 	ContainerID string `json:"containerID"`
@@ -197,20 +209,29 @@ type ComposeContainer struct {
 	State       string `json:"state"`
 }
 type ComposeCreate struct {
-	Name     string `json:"name"`
-	From     string `json:"from" validate:"required,oneof=edit path template"`
-	File     string `json:"file"`
-	Path     string `json:"path"`
-	Template uint   `json:"template"`
+	Name     string   `json:"name"`
+	From     string   `json:"from" validate:"required,oneof=edit path template"`
+	File     string   `json:"file"`
+	Path     string   `json:"path"`
+	Template uint     `json:"template"`
+	Env      []string `json:"env"`
 }
 type ComposeOperation struct {
 	Name      string `json:"name" validate:"required"`
-	Path      string `json:"path" validate:"required"`
-	Operation string `json:"operation" validate:"required,oneof=start stop down"`
+	Path      string `json:"path"`
+	Operation string `json:"operation" validate:"required,oneof=up start stop down delete"`
 	WithFile  bool   `json:"withFile"`
 }
 type ComposeUpdate struct {
-	Name    string `json:"name" validate:"required"`
-	Path    string `json:"path" validate:"required"`
-	Content string `json:"content" validate:"required"`
+	Name    string   `json:"name" validate:"required"`
+	Path    string   `json:"path" validate:"required"`
+	Content string   `json:"content" validate:"required"`
+	Env     []string `json:"env"`
+}
+
+type ContainerLog struct {
+	Container     string `json:"container" validate:"required"`
+	Since         string `json:"since"`
+	Tail          uint   `json:"tail"`
+	ContainerType string `json:"containerType"`
 }

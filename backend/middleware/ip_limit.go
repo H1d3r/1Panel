@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"errors"
 	"net"
 	"strings"
 
@@ -9,11 +8,17 @@ import (
 	"github.com/1Panel-dev/1Panel/backend/app/repo"
 	"github.com/1Panel-dev/1Panel/backend/constant"
 	"github.com/1Panel-dev/1Panel/backend/global"
+	"github.com/1Panel-dev/1Panel/backend/utils/common"
 	"github.com/gin-gonic/gin"
 )
 
 func WhiteAllow() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		clientIP := common.GetRealClientIP(c)
+		if common.IsPrivateIP(clientIP) {
+			c.Next()
+			return
+		}
 		settingRepo := repo.NewISettingRepo()
 		status, err := settingRepo.Get(settingRepo.WithByKey("AllowIPs"))
 		if err != nil {
@@ -25,7 +30,6 @@ func WhiteAllow() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		clientIP := c.ClientIP()
 		for _, ip := range strings.Split(status.Value, ",") {
 			if len(ip) == 0 {
 				continue
@@ -35,7 +39,8 @@ func WhiteAllow() gin.HandlerFunc {
 				return
 			}
 		}
-		helper.ErrorWithDetail(c, constant.CodeErrIP, constant.ErrTypeInternalServer, errors.New("IP address not allowed"))
+		code := LoadErrCode()
+		helper.ErrWithHtml(c, code, "err_ip_limit")
 	}
 }
 

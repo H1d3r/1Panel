@@ -15,7 +15,9 @@ import (
 	"github.com/1Panel-dev/1Panel/backend/app/model"
 	"github.com/1Panel-dev/1Panel/backend/buserr"
 	"github.com/1Panel-dev/1Panel/backend/constant"
+	"github.com/1Panel-dev/1Panel/backend/global"
 	"github.com/1Panel-dev/1Panel/backend/i18n"
+	"github.com/1Panel-dev/1Panel/backend/utils/cmd"
 	"github.com/1Panel-dev/1Panel/backend/utils/common"
 	"github.com/1Panel-dev/1Panel/backend/utils/files"
 	"github.com/1Panel-dev/1Panel/backend/utils/ssl"
@@ -38,6 +40,7 @@ type IWebsiteCAService interface {
 	GetCA(id uint) (*response.WebsiteCADTO, error)
 	Delete(id uint) error
 	ObtainSSL(req request.WebsiteCAObtain) (*model.WebsiteSSL, error)
+	DownloadFile(id uint) (*os.File, error)
 }
 
 func NewIWebsiteCAService() IWebsiteCAService {
@@ -82,7 +85,7 @@ func (w WebsiteCAService) Create(create request.WebsiteCACreate) (*request.Websi
 	}
 
 	rootCA := &x509.Certificate{
-		SerialNumber:          big.NewInt(time.Now().Unix()),
+		SerialNumber:          big.NewInt(time.Now().Unix() + 1),
 		Subject:               pkixName,
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().AddDate(10, 0, 0),
@@ -200,6 +203,10 @@ func (w WebsiteCAService) ObtainSSL(req request.WebsiteCAObtain) (*model.Website
 			CaID:        ca.ID,
 			AutoRenew:   req.AutoRenew,
 			Description: req.Description,
+			ExecShell:   req.ExecShell,
+		}
+		if req.ExecShell {
+			websiteSSL.Shell = req.Shell
 		}
 		if req.PushDir {
 			if !files.NewFileOp().Stat(req.Dir) {
@@ -210,15 +217,14 @@ func (w WebsiteCAService) ObtainSSL(req request.WebsiteCAObtain) (*model.Website
 		if req.Domains != "" {
 			domainArray := strings.Split(req.Domains, "\n")
 			for _, domain := range domainArray {
-				if !common.IsValidDomain(domain) {
-					err = buserr.WithName("ErrDomainFormat", domain)
-					return nil, err
-				} else {
-					if ipAddress := net.ParseIP(domain); ipAddress == nil {
-						domains = append(domains, domain)
-					} else {
-						ips = append(ips, ipAddress)
+				if ipAddress := net.ParseIP(domain); ipAddress == nil {
+					if !common.IsValidDomain(domain) {
+						err = buserr.WithName("ErrDomainFormat", domain)
+						return nil, err
 					}
+					domains = append(domains, domain)
+				} else {
+					ips = append(ips, ipAddress)
 				}
 			}
 			if len(domains) > 0 {
@@ -279,7 +285,7 @@ func (w WebsiteCAService) ObtainSSL(req request.WebsiteCAObtain) (*model.Website
 		notAfter = notAfter.AddDate(0, 0, req.Time)
 	}
 	interCsr := &x509.Certificate{
-		SerialNumber:          big.NewInt(time.Now().Unix()),
+		SerialNumber:          big.NewInt(time.Now().Unix() + 2),
 		Subject:               rootCsr.Subject,
 		NotBefore:             time.Now(),
 		NotAfter:              notAfter,
@@ -315,7 +321,7 @@ func (w WebsiteCAService) ObtainSSL(req request.WebsiteCAObtain) (*model.Website
 	subject := rootCsr.Subject
 	subject.CommonName = commonName
 	csr := &x509.Certificate{
-		SerialNumber:          big.NewInt(time.Now().Unix()),
+		SerialNumber:          big.NewInt(time.Now().Unix() + 3),
 		Subject:               subject,
 		NotBefore:             time.Now(),
 		NotAfter:              notAfter,
@@ -346,6 +352,7 @@ func (w WebsiteCAService) ObtainSSL(req request.WebsiteCAObtain) (*model.Website
 	websiteSSL.StartDate = cert.NotBefore
 	websiteSSL.Type = cert.Issuer.CommonName
 	websiteSSL.Organization = rootCsr.Subject.Organization[0]
+	websiteSSL.Status = constant.SSLReady
 
 	if req.Renew {
 		if err := websiteSSLRepo.Save(websiteSSL); err != nil {
@@ -362,6 +369,21 @@ func (w WebsiteCAService) ObtainSSL(req request.WebsiteCAObtain) (*model.Website
 	logger := log.New(logFile, "", log.LstdFlags)
 	logger.Println(i18n.GetMsgWithMap("ApplySSLSuccess", map[string]interface{}{"domain": strings.Join(domains, ",")}))
 	saveCertificateFile(websiteSSL, logger)
+	if websiteSSL.ExecShell {
+		workDir := constant.DataDir
+		if websiteSSL.PushDir {
+			workDir = websiteSSL.Dir
+		}
+		logger.Println(i18n.GetMsgByKey("ExecShellStart"))
+		if err = cmd.ExecShellWithTimeOut(websiteSSL.Shell, workDir, logger, 30*time.Minute); err != nil {
+			logger.Println(i18n.GetMsgWithMap("ErrExecShell", map[string]interface{}{"err": err.Error()}))
+		} else {
+			logger.Println(i18n.GetMsgByKey("ExecShellSuccess"))
+		}
+	}
+
+	reloadSystemSSL(websiteSSL, logger)
+
 	return websiteSSL, nil
 }
 
@@ -395,4 +417,32 @@ func createPrivateKey(keyType string) (privateKey any, publicKey any, privateKey
 	}
 	privateKeyBytes = caPrivateKeyPEM.Bytes()
 	return
+}
+
+func (w WebsiteCAService) DownloadFile(id uint) (*os.File, error) {
+	ca, err := websiteCARepo.GetFirst(commonRepo.WithByID(id))
+	if err != nil {
+		return nil, err
+	}
+	fileOp := files.NewFileOp()
+	dir := path.Join(global.CONF.System.BaseDir, "1panel/tmp/ssl", ca.Name)
+	if fileOp.Stat(dir) {
+		if err = fileOp.DeleteDir(dir); err != nil {
+			return nil, err
+		}
+	}
+	if err = fileOp.CreateDir(dir, 0666); err != nil {
+		return nil, err
+	}
+	if err = fileOp.WriteFile(path.Join(dir, "ca.crt"), strings.NewReader(ca.CSR), 0644); err != nil {
+		return nil, err
+	}
+	if err = fileOp.WriteFile(path.Join(dir, "ca.key"), strings.NewReader(ca.PrivateKey), 0644); err != nil {
+		return nil, err
+	}
+	fileName := ca.Name + ".zip"
+	if err = fileOp.Compress([]string{path.Join(dir, "ca.crt"), path.Join(dir, "ca.key")}, dir, fileName, files.SdkZip, ""); err != nil {
+		return nil, err
+	}
+	return os.Open(path.Join(dir, fileName))
 }

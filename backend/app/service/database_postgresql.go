@@ -222,6 +222,9 @@ func (u *PostgresqlService) LoadFromRemote(database string) error {
 		for i := 0; i < len(databases); i++ {
 			if strings.EqualFold(databases[i].Name, data.Name) && strings.EqualFold(databases[i].PostgresqlName, data.PostgresqlName) {
 				hasOld = true
+				if databases[i].IsDelete {
+					_ = postgresqlRepo.Update(databases[i].ID, map[string]interface{}{"is_delete": false})
+				}
 				deleteList = append(deleteList[:i], deleteList[i+1:]...)
 				break
 			}
@@ -266,7 +269,7 @@ func (u *PostgresqlService) DeleteCheck(req dto.PostgresqlDBDeleteCheck) ([]stri
 			}
 		}
 	} else {
-		apps, _ := appInstallResourceRepo.GetBy(appInstallResourceRepo.WithResourceId(db.ID))
+		apps, _ := appInstallResourceRepo.GetBy(appInstallResourceRepo.WithResourceId(db.ID), appRepo.WithKey(req.Type))
 		for _, app := range apps {
 			appInstall, _ := appInstallRepo.GetFirst(commonRepo.WithByID(app.AppInstallId))
 			if appInstall.ID != 0 {
@@ -413,6 +416,17 @@ func (u *PostgresqlService) ChangePassword(req dto.ChangeDBInfo) error {
 
 	if err := updateInstallInfoInDB(req.Type, req.Database, "password", req.Value); err != nil {
 		return err
+	}
+	if req.From == "local" {
+		remote, err := databaseRepo.Get(commonRepo.WithByName(req.Database))
+		if err != nil {
+			return err
+		}
+		pass, err := encrypt.StringEncrypt(req.Value)
+		if err != nil {
+			return fmt.Errorf("decrypt database password failed, err: %v", err)
+		}
+		_ = databaseRepo.Update(remote.ID, map[string]interface{}{"password": pass})
 	}
 	return nil
 }

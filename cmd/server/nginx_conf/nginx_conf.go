@@ -28,3 +28,15 @@ var Proxy []byte
 
 //go:embed proxy_cache.conf
 var ProxyCache []byte
+
+//go:embed 404.html
+var NotFoundHTML []byte
+
+//go:embed domain404.html
+var DomainNotFoundHTML []byte
+
+//go:embed stop.html
+var StopHTML []byte
+
+//go:embed sse.conf
+var SSE []byte

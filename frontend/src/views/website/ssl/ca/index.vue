@@ -1,11 +1,17 @@
 <template>
-    <el-drawer :close-on-click-modal="false" v-model="open" size="50%">
+    <el-drawer
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+        v-model="open"
+        size="50%"
+        @close="handleClose"
+    >
         <template #header>
-            <DrawerHeader :header="$t('ssl.ca')" :back="handleClose" />
+            <DrawerHeader :header="$t('ssl.selfSigned')" :back="handleClose" />
         </template>
         <ComplexTable :data="data" :pagination-config="paginationConfig" @search="search()" v-loading="loading">
             <template #toolbar>
-                <el-button type="primary" @click="openCreate">{{ $t('ssl.createCA') }}</el-button>
+                <el-button type="primary" @click="openCreate">{{ $t('commons.button.create') }}</el-button>
             </template>
             <el-table-column :label="$t('commons.table.name')" show-overflow-tooltip prop="name"></el-table-column>
             <el-table-column :label="$t('website.keyType')" show-overflow-tooltip prop="keyType">
@@ -24,7 +30,7 @@
                 :buttons="buttons"
                 :label="$t('commons.table.operate')"
                 fix
-                width="250px"
+                width="400px"
             />
         </ComplexTable>
         <Create ref="createRef" @close="search()" />
@@ -37,7 +43,7 @@
 <script lang="ts" setup>
 import DrawerHeader from '@/components/drawer-header/index.vue';
 import { Website } from '@/api/interface/website';
-import { DeleteCA, SearchCAs } from '@/api/modules/website';
+import { DeleteCA, SearchCAs, DownloadCAFile } from '@/api/modules/website';
 import i18n from '@/lang';
 import { reactive, ref } from 'vue';
 import Create from './create/index.vue';
@@ -71,6 +77,12 @@ const buttons = [
         label: i18n.global.t('ssl.detail'),
         click: function (row: Website.CA) {
             detailRef.value.acceptParams(row.id);
+        },
+    },
+    {
+        label: i18n.global.t('commons.button.download'),
+        click: function (row: Website.CA) {
+            onDownload(row);
         },
     },
     {
@@ -115,12 +127,29 @@ const deleteCA = async (row: any) => {
         title: i18n.global.t('commons.button.delete'),
         names: [row.name],
         msg: i18n.global.t('commons.msg.operatorHelper', [
-            i18n.global.t('website.ca'),
+            i18n.global.t('ssl.ca'),
             i18n.global.t('commons.button.delete'),
         ]),
         api: DeleteCA,
         params: { id: row.id },
     });
+};
+
+const onDownload = (row: Website.CA) => {
+    loading.value = true;
+    DownloadCAFile({ id: row.id })
+        .then((res) => {
+            const downloadUrl = window.URL.createObjectURL(new Blob([res]));
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = downloadUrl;
+            a.download = row.name + '.zip';
+            const event = new MouseEvent('click');
+            a.dispatchEvent(event);
+        })
+        .finally(() => {
+            loading.value = false;
+        });
 };
 
 defineExpose({

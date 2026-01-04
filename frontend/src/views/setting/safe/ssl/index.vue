@@ -5,18 +5,12 @@
             :destroy-on-close="true"
             @close="handleClose"
             :close-on-click-modal="false"
+            :close-on-press-escape="false"
             size="50%"
         >
             <template #header>
                 <DrawerHeader :header="$t('setting.panelSSL')" :back="handleClose" />
             </template>
-            <el-alert class="common-prompt" :closable="false" type="error">
-                <template #default>
-                    <span>
-                        <span>{{ $t('setting.panelSSLHelper') }}</span>
-                    </span>
-                </template>
-            </el-alert>
             <el-form ref="formRef" label-position="top" :model="form" :rules="rules" v-loading="loading">
                 <el-row type="flex" justify="center">
                     <el-col :span="22">
@@ -39,7 +33,9 @@
 
                         <el-form-item v-if="form.timeout">
                             <el-tag>{{ $t('setting.domainOrIP') }} {{ form.domain }}</el-tag>
-                            <el-tag style="margin-left: 5px">{{ $t('setting.timeOut') }} {{ form.timeout }}</el-tag>
+                            <el-tag style="margin-left: 5px">
+                                {{ $t('setting.timeOut') }} {{ dateFormat('', '', form.timeout) }}
+                            </el-tag>
                             <el-button
                                 @click="onDownload"
                                 style="margin-left: 5px"
@@ -132,14 +128,14 @@
 </template>
 <script lang="ts" setup>
 import { Website } from '@/api/interface/website';
-import { dateFormatSimple, getProvider } from '@/utils/util';
+import { dateFormatSimple, dateFormat, getProvider } from '@/utils/util';
 import { ListSSL } from '@/api/modules/website';
 import { reactive, ref } from 'vue';
 import i18n from '@/lang';
 import { MsgSuccess } from '@/utils/message';
 import { downloadSSL, updateSSL } from '@/api/modules/setting';
 import { Rules } from '@/global/form-rules';
-import { ElMessageBox, FormInstance } from 'element-plus';
+import { FormInstance } from 'element-plus';
 import { Setting } from '@/api/interface/setting';
 import DrawerHeader from '@/components/drawer-header/index.vue';
 import { GlobalStore } from '@/store';
@@ -236,37 +232,31 @@ const onSaveSSL = async (formEl: FormInstance | undefined) => {
     if (!formEl) return;
     formEl.validate(async (valid) => {
         if (!valid) return;
-        ElMessageBox.confirm(i18n.global.t('setting.sslChangeHelper'), 'https', {
-            confirmButtonText: i18n.global.t('commons.button.confirm'),
-            cancelButtonText: i18n.global.t('commons.button.cancel'),
-            type: 'info',
-        }).then(async () => {
-            let itemType = form.sslType;
-            if (form.sslType === 'import') {
-                itemType = form.itemSSLType === 'paste' ? 'import-paste' : 'import-local';
-            }
-            let param = {
-                ssl: 'enable',
-                sslType: itemType,
-                domain: '',
-                sslID: form.sslID,
-                cert: form.cert,
-                key: form.key,
-            };
+        let itemType = form.sslType;
+        if (form.sslType === 'import') {
+            itemType = form.itemSSLType === 'paste' ? 'import-paste' : 'import-local';
+        }
+        let param = {
+            ssl: 'enable',
+            sslType: itemType,
+            domain: '',
+            sslID: form.sslID,
+            cert: form.cert,
+            key: form.key,
+        };
+        let href = window.location.href;
+        param.domain = href.split('//')[1].split(':')[0];
+        await updateSSL(param).then(() => {
+            MsgSuccess(i18n.global.t('commons.msg.operationSuccess'));
             let href = window.location.href;
-            param.domain = href.split('//')[1].split(':')[0];
-            await updateSSL(param).then(() => {
-                MsgSuccess(i18n.global.t('commons.msg.operationSuccess'));
-                let href = window.location.href;
-                globalStore.isLogin = false;
-                let address = href.split('://')[1];
-                if (globalStore.entrance) {
-                    address = address.replaceAll('settings/safe', globalStore.entrance);
-                } else {
-                    address = address.replaceAll('settings/safe', 'login');
-                }
-                window.open(`https://${address}`, '_self');
-            });
+            globalStore.isLogin = false;
+            let address = href.split('://')[1];
+            if (globalStore.entrance) {
+                address = address.replaceAll('settings/safe', globalStore.entrance);
+            } else {
+                address = address.replaceAll('settings/safe', 'login');
+            }
+            window.open(`https://${address}`, '_self');
         });
     });
 };

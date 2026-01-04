@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 
 	"github.com/1Panel-dev/1Panel/backend/app/model"
 	"github.com/1Panel-dev/1Panel/backend/global"
@@ -31,6 +32,10 @@ func NewClient() (Client, error) {
 	return Client{
 		cli: cli,
 	}, nil
+}
+
+func (c Client) Close() {
+	_ = c.cli.Close()
 }
 
 func NewDockerClient() (*client.Client, error) {
@@ -72,6 +77,17 @@ func (c Client) ListContainersByName(names []string) ([]types.Container, error) 
 	}
 	return res, nil
 }
+func (c Client) ListAllContainers() ([]types.Container, error) {
+	var (
+		options container.ListOptions
+	)
+	options.All = true
+	containers, err := c.cli.ContainerList(context.Background(), options)
+	if err != nil {
+		return nil, err
+	}
+	return containers, nil
+}
 
 func (c Client) CreateNetwork(name string) error {
 	_, err := c.cli.NetworkCreate(context.Background(), name, types.NetworkCreate{
@@ -81,7 +97,7 @@ func (c Client) CreateNetwork(name string) error {
 }
 
 func (c Client) DeleteImage(imageID string) error {
-	if _, err := c.cli.ImageRemove(context.Background(), imageID, types.ImageRemoveOptions{Force: true}); err != nil {
+	if _, err := c.cli.ImageRemove(context.Background(), imageID, image.RemoveOptions{Force: true}); err != nil {
 		return err
 	}
 	return nil
@@ -101,7 +117,7 @@ func (c Client) PullImage(imageName string, force bool) error {
 			return nil
 		}
 	}
-	if _, err := c.cli.ImagePull(context.Background(), imageName, types.ImagePullOptions{}); err != nil {
+	if _, err := c.cli.ImagePull(context.Background(), imageName, image.PullOptions{}); err != nil {
 		return err
 	}
 	return nil
@@ -110,7 +126,7 @@ func (c Client) PullImage(imageName string, force bool) error {
 func (c Client) GetImageIDByName(imageName string) (string, error) {
 	filter := filters.NewArgs()
 	filter.Add("reference", imageName)
-	list, err := c.cli.ImageList(context.Background(), types.ImageListOptions{
+	list, err := c.cli.ImageList(context.Background(), image.ListOptions{
 		Filters: filter,
 	})
 	if err != nil {
@@ -125,7 +141,7 @@ func (c Client) GetImageIDByName(imageName string) (string, error) {
 func (c Client) CheckImageExist(imageName string) (bool, error) {
 	filter := filters.NewArgs()
 	filter.Add("reference", imageName)
-	list, err := c.cli.ImageList(context.Background(), types.ImageListOptions{
+	list, err := c.cli.ImageList(context.Background(), image.ListOptions{
 		Filters: filter,
 	})
 	if err != nil {
@@ -150,6 +166,7 @@ func CreateDefaultDockerNetwork() error {
 		global.LOG.Errorf("init docker client error %s", err.Error())
 		return err
 	}
+	defer cli.Close()
 	if !cli.NetworkExist("1panel-network") {
 		if err := cli.CreateNetwork("1panel-network"); err != nil {
 			global.LOG.Errorf("create default docker network  error %s", err.Error())

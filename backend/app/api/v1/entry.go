@@ -15,6 +15,8 @@ var (
 	appService        = service.NewIAppService()
 	appInstallService = service.NewIAppInstalledService()
 
+	AIToolService = service.NewIAIToolService()
+
 	containerService       = service.NewIContainerService()
 	composeTemplateService = service.NewIComposeTemplateService()
 	imageRepoService       = service.NewIImageRepoService()
@@ -37,6 +39,8 @@ var (
 
 	deviceService   = service.NewIDeviceService()
 	fail2banService = service.NewIFail2BanService()
+	ftpService      = service.NewIFtpService()
+	clamService     = service.NewIClamService()
 
 	settingService = service.NewISettingService()
 	backupService  = service.NewIBackupService()
@@ -64,4 +68,6 @@ var (
 	favoriteService   = service.NewIFavoriteService()
 
 	websiteCAService = service.NewIWebsiteCAService()
+
+	mcpServerService = service.NewIMcpServerService()
 )

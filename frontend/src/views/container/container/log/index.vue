@@ -4,6 +4,7 @@
             v-model="logVisible"
             :destroy-on-close="true"
             :close-on-click-modal="false"
+            :close-on-press-escape="false"
             :before-close="handleClose"
             :size="globalStore.isFullScreen ? '100%' : '50%'"
         >
@@ -16,12 +17,12 @@
                     </template>
                 </DrawerHeader>
             </template>
-            <div>
-                <el-select @change="searchLogs" class="fetchClass" v-model="logSearch.mode">
+            <div class="flex w-full flex-col gap-2 md:flex-row">
+                <el-select @change="searchLogs" v-model="logSearch.mode">
                     <template #prefix>{{ $t('container.fetch') }}</template>
                     <el-option v-for="item in timeOptions" :key="item.label" :value="item.value" :label="item.label" />
                 </el-select>
-                <el-select @change="searchLogs" class="tailClass" v-model.number="logSearch.tail">
+                <el-select @change="searchLogs" v-model.number="logSearch.tail">
                     <template #prefix>{{ $t('container.lines') }}</template>
                     <el-option :value="0" :label="$t('commons.table.all')" />
                     <el-option :value="100" :label="100" />
@@ -29,15 +30,13 @@
                     <el-option :value="500" :label="500" />
                     <el-option :value="1000" :label="1000" />
                 </el-select>
-                <div class="margin-button" style="float: left">
-                    <el-checkbox border @change="searchLogs" v-model="logSearch.isWatch">
-                        {{ $t('commons.button.watch') }}
-                    </el-checkbox>
-                </div>
-                <el-button class="margin-button" @click="onDownload" icon="Download">
+                <el-checkbox border @change="searchLogs" v-model="logSearch.isWatch">
+                    {{ $t('commons.button.watch') }}
+                </el-checkbox>
+                <el-button @click="onDownload" icon="Download">
                     {{ $t('file.download') }}
                 </el-button>
-                <el-button class="margin-button" @click="onClean" icon="Delete">
+                <el-button @click="onClean" icon="Delete">
                     {{ $t('commons.button.clean') }}
                 </el-button>
             </div>
@@ -67,10 +66,10 @@
 </template>
 
 <script lang="ts" setup>
-import { cleanContainerLog } from '@/api/modules/container';
+import { cleanContainerLog, DownloadFile } from '@/api/modules/container';
 import i18n from '@/lang';
-import { dateFormatForName, downloadWithContent } from '@/utils/util';
-import { computed, onBeforeUnmount, reactive, ref, shallowRef, watch } from 'vue';
+import { dateFormatForName } from '@/utils/util';
+import { computed, nextTick, onBeforeUnmount, reactive, ref, shallowRef, watch } from 'vue';
 import { Codemirror } from 'vue-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
@@ -123,17 +122,16 @@ const timeOptions = ref([
 ]);
 
 function toggleFullscreen() {
-    if (screenfull.isEnabled) {
-        screenfull.toggle();
-    }
+    globalStore.isFullScreen = !globalStore.isFullScreen;
 }
 
 const loadTooltip = () => {
-    return i18n.global.t('commons.button.' + (screenfull.isFullscreen ? 'quitFullscreen' : 'fullscreen'));
+    return i18n.global.t('commons.button.' + (globalStore.isFullScreen ? 'quitFullscreen' : 'fullscreen'));
 };
 const handleClose = async () => {
     terminalSocket.value?.send('close conn');
     logVisible.value = false;
+    globalStore.isFullScreen = false;
 };
 watch(logVisible, (val) => {
     if (screenfull.isEnabled && !val && !mobile.value) screenfull.exit();
@@ -154,25 +152,41 @@ const searchLogs = async () => {
     );
     terminalSocket.value.onmessage = (event) => {
         logInfo.value += event.data.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
-        const state = view.value.state;
-        view.value.dispatch({
-            selection: { anchor: state.doc.length, head: state.doc.length },
-            scrollIntoView: true,
+        nextTick(() => {
+            const state = view.value.state;
+            view.value.dispatch({
+                selection: { anchor: state.doc.length, head: state.doc.length },
+                scrollIntoView: true,
+            });
         });
     };
 };
 
 const onDownload = async () => {
-    let msg =
-        logSearch.tail === 0
-            ? i18n.global.t('container.downLogHelper1', [logSearch.container])
-            : i18n.global.t('container.downLogHelper2', [logSearch.container, logSearch.tail]);
+    logSearch.tail = 0;
+    let msg = i18n.global.t('container.downLogHelper1', [logSearch.container]);
     ElMessageBox.confirm(msg, i18n.global.t('file.download'), {
         confirmButtonText: i18n.global.t('commons.button.confirm'),
         cancelButtonText: i18n.global.t('commons.button.cancel'),
         type: 'info',
     }).then(async () => {
-        downloadWithContent(logInfo.value, logSearch.container + '-' + dateFormatForName(new Date()) + '.log');
+        let params = {
+            container: logSearch.containerID,
+            since: logSearch.mode,
+            tail: logSearch.tail,
+            containerType: 'container',
+        };
+        let addItem = {};
+        addItem['name'] = logSearch.container + '-' + dateFormatForName(new Date()) + '.log';
+        DownloadFile(params).then((res) => {
+            const downloadUrl = window.URL.createObjectURL(new Blob([res]));
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = downloadUrl;
+            a.download = addItem['name'];
+            const event = new MouseEvent('click');
+            a.dispatchEvent(event);
+        });
     });
 };
 
@@ -219,19 +233,14 @@ defineExpose({
 </script>
 
 <style scoped lang="scss">
-.margin-button {
-    margin-left: 20px;
-}
 .fullScreen {
     border: none;
 }
-.tailClass {
-    width: 20%;
+.select-width {
+    width: 50%;
     float: left;
-    margin-left: 20px;
 }
-.fetchClass {
-    width: 30%;
-    float: left;
+.el-button + .el-button {
+    margin: 0 !important;
 }
 </style>

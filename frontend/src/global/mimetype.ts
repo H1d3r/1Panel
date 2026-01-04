@@ -28,6 +28,14 @@ export const Languages = [
         value: ['json'],
     },
     {
+        label: 'vue',
+        value: ['vue'],
+    },
+    {
+        label: 'typescript',
+        value: ['ts'],
+    },
+    {
         label: 'lua',
         value: ['lua'],
     },
@@ -86,6 +94,10 @@ export const Languages = [
     {
         label: 'css',
         value: ['css'],
+    },
+    {
+        label: 'ini',
+        value: ['ini'],
     },
 ];
 
@@ -157,11 +169,15 @@ export const DNSTypes = [
         value: 'TencentCloud',
     },
     {
-        label: 'DNSPod (' + i18n.global.t('ssl.deprecated') + ')',
-        value: 'DnsPod',
+        label: i18n.global.t('website.huaweicloud'),
+        value: 'HuaweiCloud',
     },
     {
-        label: 'CloudFlare',
+        label: 'GoDaddy',
+        value: 'Godaddy',
+    },
+    {
+        label: 'Cloudflare',
         value: 'CloudFlare',
     },
     {
@@ -173,12 +189,40 @@ export const DNSTypes = [
         value: 'NameCheap',
     },
     {
+        label: 'CloudDNS',
+        value: 'CloudDns',
+    },
+    {
+        label: 'ClouDNS',
+        value: 'ClouDNS',
+    },
+    {
         label: 'Name.com',
         value: 'NameCom',
     },
     {
-        label: 'GoDaddy',
-        value: 'Godaddy',
+        label: 'FreeMyIP',
+        value: 'FreeMyIP',
+    },
+    {
+        label: i18n.global.t('website.rainyun'),
+        value: 'RainYun',
+    },
+    {
+        label: i18n.global.t('website.westCN'),
+        value: 'WestCN',
+    },
+    {
+        label: 'PorkBun',
+        value: 'PorkBun',
+    },
+    {
+        label: i18n.global.t('website.volcengine'),
+        value: 'Volcengine',
+    },
+    {
+        label: 'DNSPod (' + i18n.global.t('ssl.deprecated') + ')',
+        value: 'DnsPod',
     },
 ];
 

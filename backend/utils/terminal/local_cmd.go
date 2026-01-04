@@ -25,8 +25,13 @@ type LocalCommand struct {
 	pty *os.File
 }
 
-func NewCommand(commands string) (*LocalCommand, error) {
-	cmd := exec.Command("sh", "-c", commands)
+func NewCommand(initCmd []string) (*LocalCommand, error) {
+	cmd := exec.Command("docker", initCmd...)
+	if term := os.Getenv("TERM"); term != "" {
+		cmd.Env = append(os.Environ(), "TERM="+term)
+	} else {
+		cmd.Env = append(os.Environ(), "TERM=xterm")
+	}
 
 	pty, err := pty.Start(cmd)
 	if err != nil {
@@ -90,4 +95,5 @@ func (lcmd *LocalCommand) Wait(quitChan chan bool) {
 		global.LOG.Errorf("ssh session wait failed, err: %v", err)
 		setQuit(quitChan)
 	}
+	setQuit(quitChan)
 }

@@ -25,7 +25,7 @@
                     {{ $t('website.log') }}
                 </el-button>
                 <el-button type="primary" :plain="index !== 'resource'" @click="changeTab('resource')">
-                    {{ $t('website.source') }}
+                    {{ $t('website.source', 2) }}
                 </el-button>
                 <el-button type="primary" v-if="configPHP" :plain="index !== 'php'" @click="changeTab('php')">
                     PHP
@@ -33,7 +33,6 @@
             </template>
             <template #main>
                 <Basic :id="id" v-if="index === 'basic'"></Basic>
-                <Safety :id="id" v-if="index === 'safety'"></Safety>
                 <Log :id="id" v-if="index === 'log'"></Log>
                 <Resource :id="id" v-if="index === 'resource'"></Resource>
                 <PHP :id="id" v-if="index === 'php'"></PHP>

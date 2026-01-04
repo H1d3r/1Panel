@@ -17,18 +17,14 @@ export const logOutApi = () => {
     return http.post<any>(`/auth/logout`);
 };
 
-export const checkIsSafety = (code: string) => {
-    return http.get<string>(`/auth/issafety?code=${code}`);
-};
-
-export const getResponsePage = () => {
-    return http.get<string>(`/respagecode`);
-};
-
 export const checkIsDemo = () => {
     return http.get<boolean>('/auth/demo');
 };
 
-export const getLanguage = () => {
-    return http.get<string>(`/auth/language`);
+export const getAuthSetting = () => {
+    return http.get<Login.LoginSetting>(`/auth/setting`);
+};
+
+export const checkIsIntl = () => {
+    return http.get<boolean>('/auth/intl');
 };

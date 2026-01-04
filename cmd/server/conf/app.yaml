@@ -2,9 +2,10 @@ system:
   db_file: 1Panel.db
   base_dir: /opt
   mode: dev
-  repo_url: https://resource.fit2cloud.com/1panel/package
-  app_repo: https://apps-assets.fit2cloud.com
+  repo_url: https://resource.1panel.pro
+  app_repo: https://apps.1panel.pro
   is_demo: false
+  is_intl: true
   port: 9999
   username: admin
   password: admin123

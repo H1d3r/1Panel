@@ -2,63 +2,153 @@ package systemctl
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"os/exec"
-	"strings"
+	"os"
+
+	"github.com/1Panel-dev/1Panel/backend/global"
 )
 
-func RunSystemCtl(args ...string) (string, error) {
-	cmd := exec.Command("systemctl", args...)
-	output, err := cmd.CombinedOutput()
+func DefaultHandler(serviceName string) (*ServiceHandler, error) {
+	svcName, err := smartServiceName(serviceName)
 	if err != nil {
-		return string(output), fmt.Errorf("failed to run command: %w", err)
+		return nil, ErrServiceNotFound
 	}
-	return string(output), nil
+	return NewServiceHandler(defaultServiceConfig(svcName)), nil
 }
 
-func IsActive(serviceName string) (bool, error) {
-	out, err := RunSystemCtl("is-active", serviceName)
+func GetServiceName(serviceName string) (string, error) {
+	serviceName, err := smartServiceName(serviceName)
 	if err != nil {
-		return false, err
+		return "", ErrServiceNotFound
 	}
-	return out == "active\n", nil
+	return serviceName, nil
 }
 
-func IsEnable(serviceName string) (bool, error) {
-	out, err := RunSystemCtl("is-enabled", serviceName)
+func GetServicePath(serviceName string) (string, error) {
+	handler, err := DefaultHandler(serviceName)
 	if err != nil {
-		return false, err
+		return "", ErrServiceNotFound
 	}
-	return out == "enabled\n", nil
+	return handler.GetServicePath()
+}
+
+func CustomAction(action string, serviceName string) (ServiceResult, error) {
+	handler, err := DefaultHandler(serviceName)
+	if err != nil {
+		global.LOG.Errorf("CustomAction handler init failed: %v", err)
+		return ServiceResult{}, ErrServiceNotFound
+	}
+	result, err := handler.ExecuteAction(action)
+	if err != nil {
+		global.LOG.Errorf("CustomAction %s failed: %v", action, err)
+		return result, fmt.Errorf("%s operation failed: %w | Output: %s", action, err, result.Output)
+	}
+	return result, nil
 }
 
 func IsExist(serviceName string) (bool, error) {
-	out, err := RunSystemCtl("is-enabled", serviceName)
+	handler, err := DefaultHandler(serviceName)
 	if err != nil {
-		if strings.Contains(out, "disabled") {
-			return true, nil
-		}
 		return false, nil
 	}
-	return true, nil
+	result, _ := handler.IsExists()
+	if result.IsExists {
+		return true, nil
+	} else {
+		return false, nil
+	}
 }
 
-func handlerErr(out string, err error) error {
+func Start(serviceName string) error {
+	handler, _ := DefaultHandler(serviceName)
+	result, err := handler.StartService()
 	if err != nil {
-		if out != "" {
-			return errors.New(out)
-		}
-		return err
+		global.LOG.Errorf("Service start failed: %v | Output: %s", err, result.Output)
+		return fmt.Errorf("start failed: %v | Output: %s", err, result.Output)
+	}
+	return nil
+}
+
+func Stop(serviceName string) error {
+	handler, err := DefaultHandler(serviceName)
+	if err != nil {
+		global.LOG.Errorf("Stop handler init failed: %v", err)
+		return fmt.Errorf("%s is not exist", serviceName)
+	}
+	result, err := handler.StopService()
+	if err != nil {
+		global.LOG.Errorf("Service stop failed: %v", err)
+		return fmt.Errorf("stop failed: %v | Output: %s", err, result.Output)
 	}
 	return nil
 }
 
 func Restart(serviceName string) error {
-	out, err := RunSystemCtl("restart", serviceName)
-	return handlerErr(out, err)
+	handler, err := DefaultHandler(serviceName)
+	if err != nil {
+		global.LOG.Errorf("Restart handler init failed: %v", err)
+		return fmt.Errorf("%s is not exist", serviceName)
+	}
+	result, err := handler.RestartService()
+	if err != nil {
+		global.LOG.Errorf("Service restart failed: %v", err)
+		return fmt.Errorf("restart failed: %v | Output: %s", err, result.Output)
+	}
+	return nil
 }
 
-func Operate(operate, serviceName string) error {
-	out, err := RunSystemCtl(operate, serviceName)
-	return handlerErr(out, err)
+func Enable(serviceName string) error {
+	handler, err := DefaultHandler(serviceName)
+	if err != nil {
+		global.LOG.Errorf("Enable handler init failed: %v", err)
+		return fmt.Errorf("%s is not exist", serviceName)
+	}
+	result, err := handler.EnableService()
+	if err != nil {
+		global.LOG.Errorf("Service enable failed: %v | Output: %s", err, result.Output)
+		return fmt.Errorf("%s enable failed: %v ", serviceName, err)
+	}
+	return nil
+}
+
+func Disable(serviceName string) error {
+	handler, _ := DefaultHandler(serviceName)
+	result, err := handler.DisableService()
+	if err != nil {
+		global.LOG.Errorf("Service disable failed: %v", err)
+		return fmt.Errorf("disable failed: %v | Output: %s", err, result.Output)
+	}
+	return nil
+}
+
+func IsActive(serviceName string) (bool, error) {
+	handler, err := DefaultHandler(serviceName)
+	if err != nil {
+		return false, nil
+	}
+	status, err := handler.IsActive()
+	if err != nil {
+		return false, nil
+	}
+	return status.IsActive, nil
+}
+
+func IsEnable(serviceName string) (bool, error) {
+	handler, err := DefaultHandler(serviceName)
+	if err != nil {
+		return false, nil
+	}
+	status, err := handler.IsEnabled()
+	if err != nil {
+		return false, nil
+	}
+	return status.IsEnabled, nil
+}
+
+type LogOption struct {
+	TailLines string
+}
+
+func FileExist(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

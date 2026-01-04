@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"os"
 	"time"
 
 	"github.com/1Panel-dev/1Panel/backend/global"
@@ -10,7 +11,8 @@ import (
 
 func Init() {
 	c := global.CONF.System.Cache
-
+	_ = os.RemoveAll(c)
+	_ = os.Mkdir(c, 0755)
 	options := badger.Options{
 		Dir:                c,
 		ValueDir:           c,
@@ -49,7 +51,8 @@ func Init() {
 	if err != nil {
 		panic(err)
 	}
-
+	_ = cache.DropAll()
+	global.CacheDb = cache
 	global.CACHE = badger_db.NewCacheDB(cache)
 	global.LOG.Info("init cache successfully")
 }

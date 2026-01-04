@@ -2,14 +2,23 @@
     <div>
         <div class="flex items-center">
             <div class="flex-shrink-0 flex items-center mr-4">
-                <el-button :icon="Back" @click="back" circle :disabled="paths.length == 0" />
-                <el-button :icon="Refresh" circle @click="search" />
+                <el-tooltip :content="$t('file.back')" placement="top">
+                    <el-button :icon="Back" @click="back" circle />
+                </el-tooltip>
+                <el-tooltip :content="$t('file.right')" placement="top">
+                    <el-button :icon="Right" @click="right" circle />
+                </el-tooltip>
+                <el-tooltip :content="$t('file.top')" placement="top">
+                    <el-button :icon="Top" @click="top" circle :disabled="paths.length == 0" />
+                </el-tooltip>
+                <el-tooltip :content="$t('file.refresh')" placement="top">
+                    <el-button :icon="Refresh" circle @click="search" />
+                </el-tooltip>
             </div>
             <div
                 v-show="!searchableStatus"
                 tabindex="0"
                 @click="searchableStatus = true"
-                :class="globalStore.$state.themeConfig.theme === 'light' && 'bg-white'"
                 class="address-bar shadow-md rounded-md px-4 py-2 flex items-center flex-grow"
             >
                 <div ref="pathRef" class="w-full">
@@ -44,125 +53,280 @@
             <template #prompt>
                 <el-alert type="info" :closable="false">
                     <template #title>
-                        <span v-html="$t('file.fileHeper')"></span>
+                        <span class="input-help whitespace-break-spaces">
+                            {{ $t('file.fileHelper') }}
+                        </span>
                     </template>
                 </el-alert>
             </template>
             <template #toolbar>
-                <div class="btn-container">
-                    <div class="left-section">
-                        <el-dropdown @command="handleCreate">
-                            <el-button type="primary">
-                                {{ $t('commons.button.create') }}
-                                <el-icon><arrow-down /></el-icon>
-                            </el-button>
-                            <template #dropdown>
-                                <el-dropdown-menu>
-                                    <el-dropdown-item command="dir">
-                                        <svg-icon iconName="p-file-folder"></svg-icon>
-                                        {{ $t('file.dir') }}
-                                    </el-dropdown-item>
-                                    <el-dropdown-item command="file">
-                                        <svg-icon iconName="p-file-normal"></svg-icon>
-                                        {{ $t('file.file') }}
-                                    </el-dropdown-item>
-                                </el-dropdown-menu>
-                            </template>
-                        </el-dropdown>
-                        <el-button-group>
-                            <el-button plain @click="openUpload">{{ $t('file.upload') }}</el-button>
-                            <el-button plain @click="openWget">{{ $t('file.remoteFile') }}</el-button>
-                            <el-button plain @click="openMove('copy')" :disabled="selects.length === 0">
-                                {{ $t('file.copy') }}
-                            </el-button>
-                            <el-button plain @click="openMove('cut')" :disabled="selects.length === 0">
-                                {{ $t('file.move') }}
-                            </el-button>
-                            <el-button plain @click="openCompress(selects)" :disabled="selects.length === 0">
-                                {{ $t('file.compress') }}
-                            </el-button>
-                            <el-button plain @click="openBatchRole(selects)" :disabled="selects.length === 0">
-                                {{ $t('file.role') }}
-                            </el-button>
-                            <el-button plain @click="batchDelFiles" :disabled="selects.length === 0">
-                                {{ $t('commons.button.delete') }}
-                            </el-button>
-                        </el-button-group>
+                <div class="hidden sm:block">
+                    <div class="btn-container">
+                        <div class="left-section">
+                            <el-dropdown @command="handleCreate">
+                                <el-button type="primary">
+                                    {{ $t('commons.button.create') }}
+                                    <el-icon><arrow-down /></el-icon>
+                                </el-button>
+                                <template #dropdown>
+                                    <el-dropdown-menu>
+                                        <el-dropdown-item command="dir">
+                                            <svg-icon iconName="p-file-folder"></svg-icon>
+                                            {{ $t('file.dir') }}
+                                        </el-dropdown-item>
+                                        <el-dropdown-item command="file">
+                                            <svg-icon iconName="p-file-normal"></svg-icon>
+                                            {{ $t('file.file') }}
+                                        </el-dropdown-item>
+                                    </el-dropdown-menu>
+                                </template>
+                            </el-dropdown>
+                            <el-button-group>
+                                <el-button plain @click="openUpload">{{ $t('file.upload') }}</el-button>
+                                <el-button plain @click="openWget">{{ $t('file.remoteFile') }}</el-button>
+                                <el-button plain @click="openMove('copy')" :disabled="selects.length === 0">
+                                    {{ $t('file.copy') }}
+                                </el-button>
+                                <el-button plain @click="openMove('cut')" :disabled="selects.length === 0">
+                                    {{ $t('file.move') }}
+                                </el-button>
+                                <el-button plain @click="openCompress(selects)" :disabled="selects.length === 0">
+                                    {{ $t('file.compress') }}
+                                </el-button>
+                                <el-button plain @click="openBatchRole(selects)" :disabled="selects.length === 0">
+                                    {{ $t('file.editPermissions') }}
+                                </el-button>
+                                <el-button plain @click="batchDelFiles" :disabled="selects.length === 0">
+                                    {{ $t('commons.button.delete') }}
+                                </el-button>
+                            </el-button-group>
 
-                        <el-button class="btn" @click="toTerminal">
+                            <el-button class="btn" @click="toTerminal">
+                                {{ $t('file.terminal') }}
+                            </el-button>
+
+                            <el-button-group class="copy-button" v-if="moveOpen">
+                                <el-tooltip
+                                    class="box-item"
+                                    effect="dark"
+                                    :content="$t('file.paste')"
+                                    placement="bottom"
+                                >
+                                    <el-button plain @click="openPaste">
+                                        {{ $t('file.paste') }}({{ fileMove.count }})
+                                    </el-button>
+                                </el-tooltip>
+                                <el-tooltip
+                                    class="box-item"
+                                    effect="dark"
+                                    :content="$t('file.cancel')"
+                                    placement="bottom"
+                                >
+                                    <el-button plain class="close" @click="closeMove">
+                                        <el-icon class="close-icon"><Close /></el-icon>
+                                    </el-button>
+                                </el-tooltip>
+                            </el-button-group>
+                        </div>
+
+                        <div class="right-section">
+                            <el-popover placement="bottom" :width="200" trigger="hover" @before-enter="getFavoriates">
+                                <template #reference>
+                                    <el-button @click="openFavorite">
+                                        {{ $t('file.favorite') }}
+                                    </el-button>
+                                </template>
+                                <div class="favorite-item">
+                                    <el-table :data="favorites">
+                                        <el-table-column prop="name">
+                                            <template #default="{ row }">
+                                                <el-tooltip
+                                                    class="box-item"
+                                                    effect="dark"
+                                                    :content="row.path"
+                                                    placement="top"
+                                                >
+                                                    <span
+                                                        class="table-link text-ellipsis"
+                                                        @click="toFavorite(row)"
+                                                        type="primary"
+                                                    >
+                                                        <svg-icon
+                                                            v-if="row.isDir"
+                                                            className="table-icon"
+                                                            iconName="p-file-folder"
+                                                        ></svg-icon>
+                                                        <svg-icon
+                                                            v-else
+                                                            className="table-icon"
+                                                            iconName="p-file-normal"
+                                                        ></svg-icon>
+                                                        {{ row.name }}
+                                                    </span>
+                                                </el-tooltip>
+                                            </template>
+                                        </el-table-column>
+                                    </el-table>
+                                </div>
+                            </el-popover>
+
+                            <el-button class="btn" @click="openRecycleBin">
+                                {{ $t('file.recycleBin') }}
+                            </el-button>
+                            <div class="search-button">
+                                <el-input
+                                    v-model="req.search"
+                                    clearable
+                                    @clear="search()"
+                                    @keydown.enter="search()"
+                                    :placeholder="$t('file.search')"
+                                >
+                                    <template #prepend>
+                                        <el-checkbox v-model="req.containSub">
+                                            {{ $t('file.sub') }}
+                                        </el-checkbox>
+                                    </template>
+                                    <template #append>
+                                        <el-button icon="Search" @click="search" round />
+                                    </template>
+                                </el-input>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="block flex flex-wrap gap-4 sm:hidden">
+                    <el-dropdown @command="handleCreate">
+                        <el-button type="primary">
+                            {{ $t('commons.button.create') }}
+                            <el-icon><arrow-down /></el-icon>
+                        </el-button>
+                        <template #dropdown>
+                            <el-dropdown-menu>
+                                <el-dropdown-item command="dir">
+                                    <svg-icon iconName="p-file-folder"></svg-icon>
+                                    {{ $t('file.dir') }}
+                                </el-dropdown-item>
+                                <el-dropdown-item command="file">
+                                    <svg-icon iconName="p-file-normal"></svg-icon>
+                                    {{ $t('file.file') }}
+                                </el-dropdown-item>
+                            </el-dropdown-menu>
+                        </template>
+                    </el-dropdown>
+                    <el-dropdown @command="handleFilePatch">
+                        <el-button type="primary">
+                            {{ $t('file.batchoperation') }}
+                            <el-icon><arrow-down /></el-icon>
+                        </el-button>
+                        <template #dropdown>
+                            <el-dropdown-menu>
+                                <el-dropdown-item command="openUpload">
+                                    {{ $t('file.upload') }}
+                                </el-dropdown-item>
+
+                                <el-dropdown-item command="openWget">
+                                    {{ $t('file.remoteFile') }}
+                                </el-dropdown-item>
+
+                                <el-dropdown-item command="openMove:copy" :disabled="selects.length === 0">
+                                    {{ $t('file.copy') }}
+                                </el-dropdown-item>
+
+                                <el-dropdown-item command="openMove:cut" :disabled="selects.length === 0">
+                                    {{ $t('file.move') }}
+                                </el-dropdown-item>
+
+                                <el-dropdown-item command="openCompress" :disabled="selects.length === 0">
+                                    {{ $t('file.compress') }}
+                                </el-dropdown-item>
+
+                                <el-dropdown-item command="openBatchRole" :disabled="selects.length === 0">
+                                    {{ $t('file.role') }}
+                                </el-dropdown-item>
+
+                                <el-dropdown-item command="batchDelFiles" :disabled="selects.length === 0">
+                                    {{ $t('commons.button.delete') }}
+                                </el-dropdown-item>
+                            </el-dropdown-menu>
+                        </template>
+                    </el-dropdown>
+
+                    <el-button-group v-if="moveOpen">
+                        <el-tooltip class="box-item" effect="dark" :content="$t('file.paste')" placement="bottom">
+                            <el-button plain @click="openPaste">{{ $t('file.paste') }}({{ fileMove.count }})</el-button>
+                        </el-tooltip>
+                        <el-tooltip class="box-item" effect="dark" :content="$t('file.cancel')" placement="bottom">
+                            <el-button plain class="close" @click="closeMove">
+                                <el-icon class="close-icon"><Close /></el-icon>
+                            </el-button>
+                        </el-tooltip>
+                    </el-button-group>
+
+                    <div class="flex flex-row gap-4">
+                        <el-button @click="toTerminal">
                             {{ $t('menu.terminal') }}
                         </el-button>
 
-                        <el-button-group class="copy-button" v-if="moveOpen">
-                            <el-tooltip class="box-item" effect="dark" :content="$t('file.paste')" placement="bottom">
-                                <el-button plain @click="openPaste">
-                                    {{ $t('file.paste') }}({{ fileMove.count }})
-                                </el-button>
-                            </el-tooltip>
-                            <el-tooltip class="box-item" effect="dark" :content="$t('file.cancel')" placement="bottom">
-                                <el-button plain class="close" @click="closeMove">
-                                    <el-icon class="close-icon"><Close /></el-icon>
-                                </el-button>
-                            </el-tooltip>
-                        </el-button-group>
-                    </div>
-
-                    <div class="right-section">
-                        <el-popover placement="bottom" :width="200" trigger="hover" @before-enter="getFavoriates">
-                            <template #reference>
-                                <el-button @click="openFavorite">
-                                    {{ $t('file.favorite') }}
-                                </el-button>
-                            </template>
-                            <div class="favorite-item">
+                        <div>
+                            <el-popover placement="bottom" trigger="hover" @before-enter="getFavoriates">
+                                <template #reference>
+                                    <el-button @click="openFavorite">
+                                        {{ $t('file.favorite') }}
+                                    </el-button>
+                                </template>
                                 <el-table :data="favorites">
                                     <el-table-column prop="name">
                                         <template #default="{ row }">
-                                            <span
-                                                class="table-link text-ellipsis"
-                                                @click="toFavorite(row)"
-                                                type="primary"
+                                            <el-tooltip
+                                                class="box-item"
+                                                effect="dark"
+                                                :content="row.path"
+                                                placement="top"
                                             >
-                                                <svg-icon
-                                                    v-if="row.isDir"
-                                                    className="table-icon"
-                                                    iconName="p-file-folder"
-                                                ></svg-icon>
-                                                <svg-icon
-                                                    v-else
-                                                    className="table-icon"
-                                                    iconName="p-file-normal"
-                                                ></svg-icon>
-                                                {{ row.name }}
-                                            </span>
+                                                <span
+                                                    class="table-link text-ellipsis"
+                                                    @click="toFavorite(row)"
+                                                    type="primary"
+                                                >
+                                                    <svg-icon
+                                                        v-if="row.isDir"
+                                                        className="table-icon"
+                                                        iconName="p-file-folder"
+                                                    ></svg-icon>
+                                                    <svg-icon
+                                                        v-else
+                                                        className="table-icon"
+                                                        iconName="p-file-normal"
+                                                    ></svg-icon>
+                                                    {{ row.name }}
+                                                </span>
+                                            </el-tooltip>
                                         </template>
                                     </el-table-column>
                                 </el-table>
-                            </div>
-                        </el-popover>
+                            </el-popover>
+                        </div>
 
-                        <el-button class="btn" @click="openRecycleBin">
+                        <el-button @click="openRecycleBin">
                             {{ $t('file.recycleBin') }}
                         </el-button>
-                        <div class="search-button">
-                            <el-input
-                                v-model="req.search"
-                                clearable
-                                @clear="search()"
-                                @keydown.enter="search()"
-                                :placeholder="$t('file.search')"
-                            >
-                                <template #prepend>
-                                    <el-checkbox v-model="req.containSub">
-                                        {{ $t('file.sub') }}
-                                    </el-checkbox>
-                                </template>
-                                <template #append>
-                                    <el-button icon="Search" @click="search" round />
-                                </template>
-                            </el-input>
-                        </div>
                     </div>
+                    <el-input
+                        v-model="req.search"
+                        clearable
+                        @clear="search()"
+                        @keydown.enter="search()"
+                        :placeholder="$t('file.search')"
+                    >
+                        <template #prepend>
+                            <el-checkbox v-model="req.containSub">
+                                {{ $t('file.sub') }}
+                            </el-checkbox>
+                        </template>
+                        <template #append>
+                            <el-button icon="Search" @click="search" round />
+                        </template>
+                    </el-input>
                 </div>
             </template>
             <template #main>
@@ -222,29 +386,35 @@
                             </div>
                         </template>
                     </el-table-column>
-                    <el-table-column :label="$t('file.mode')" prop="mode" max-width="50">
+                    <el-table-column :label="$t('file.mode')" prop="mode" min-width="110">
                         <template #default="{ row }">
                             <el-link :underline="false" @click="openMode(row)">{{ row.mode }}</el-link>
                         </template>
                     </el-table-column>
-                    <el-table-column :label="$t('commons.table.user')" prop="user" show-overflow-tooltip>
+                    <el-table-column :label="$t('commons.table.user')" prop="user" show-overflow-tooltip min-width="90">
                         <template #default="{ row }">
                             <el-link :underline="false" @click="openChown(row)">
                                 {{ row.user ? row.user : '-' }} ({{ row.uid }})
                             </el-link>
                         </template>
                     </el-table-column>
-                    <el-table-column :label="$t('file.group')" prop="group">
+                    <el-table-column :label="$t('file.group')" prop="group" show-overflow-tooltip>
                         <template #default="{ row }">
                             <el-link :underline="false" @click="openChown(row)">
                                 {{ row.group ? row.group : '-' }} ({{ row.gid }})
                             </el-link>
                         </template>
                     </el-table-column>
-                    <el-table-column :label="$t('file.size')" prop="size" max-width="50" sortable>
+                    <el-table-column :label="$t('file.size')" prop="size" min-width="100" sortable>
                         <template #default="{ row, $index }">
                             <span v-if="row.isDir">
-                                <el-button type="primary" link small @click="getDirSize(row, $index)">
+                                <el-button
+                                    type="primary"
+                                    link
+                                    small
+                                    @click="getDirSize(row, $index)"
+                                    :loading="btnLoading.includes($index)"
+                                >
                                     <span v-if="row.dirSize == undefined">
                                         {{ $t('file.calculate') }}
                                     </span>
@@ -268,6 +438,7 @@
                         :label="$t('commons.table.operate')"
                         :min-width="mobile ? 'auto' : 200"
                         :fixed="mobile ? false : 'right'"
+                        width="300"
                         fix
                     />
                 </ComplexTable>
@@ -290,12 +461,14 @@
             <RecycleBin ref="recycleBinRef" @close="search" />
             <Favorite ref="favoriteRef" @close="search" />
             <BatchRole ref="batchRoleRef" @close="search" />
+            <VscodeOpenDialog ref="dialogVscodeOpenRef" />
+            <Preview ref="previewRef" />
         </LayoutContent>
     </div>
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, reactive, ref, computed } from '@vue/runtime-core';
+import { nextTick, onMounted, reactive, ref, computed } from 'vue';
 import {
     GetFilesList,
     GetFileContent,
@@ -304,12 +477,11 @@ import {
     RemoveFavorite,
     SearchFavorite,
 } from '@/api/modules/files';
-import { computeSize, copyText, dateFormat, downloadFile, getIcon, getRandomStr } from '@/utils/util';
-import { StarFilled, Star } from '@element-plus/icons-vue';
+import { computeSize, copyText, dateFormat, downloadFile, getFileType, getIcon, getRandomStr } from '@/utils/util';
 import { File } from '@/api/interface/file';
 import { Mimetypes, Languages } from '@/global/mimetype';
 import { useRouter } from 'vue-router';
-import { Back, Refresh } from '@element-plus/icons-vue';
+import { Back, Refresh, StarFilled, Star, Top, Right, Close } from '@element-plus/icons-vue';
 import { MsgWarning } from '@/utils/message';
 import { useSearchable } from './hooks/searchable';
 import { ResultData } from '@/api/interface';
@@ -333,6 +505,8 @@ import Detail from './detail/index.vue';
 import RecycleBin from './recycle-bin/index.vue';
 import Favorite from './favorite/index.vue';
 import BatchRole from './batch-role/index.vue';
+import Preview from './preview/index.vue';
+import VscodeOpenDialog from '@/components/vscode-open/index.vue';
 
 const globalStore = GlobalStore();
 
@@ -360,18 +534,22 @@ const initData = () => ({
 });
 let req = reactive(initData());
 let loading = ref(false);
+let btnLoading = ref([]);
 const paths = ref<FilePaths[]>([]);
 let pathWidth = ref(0);
+const history: string[] = [];
+let pointer = -1;
 
 const fileCreate = reactive({ path: '/', isDir: false, mode: 0o755 });
 const fileCompress = reactive({ files: [''], name: '', dst: '', operate: 'compress' });
 const fileDeCompress = reactive({ path: '', name: '', dst: '', mimeType: '' });
-const fileEdit = reactive({ content: '', path: '', name: '', language: 'plaintext' });
+const fileEdit = reactive({ content: '', path: '', name: '', language: 'plaintext', extension: '' });
+const filePreview = reactive({ path: '', name: '', extension: '', fileType: '' });
 const codeReq = reactive({ path: '', expand: false, page: 1, pageSize: 100 });
 const fileUpload = reactive({ path: '' });
 const fileRename = reactive({ path: '', oldName: '' });
 const fileWget = reactive({ path: '' });
-const fileMove = reactive({ oldPaths: [''], type: '', path: '', name: '', count: 0 });
+const fileMove = reactive({ oldPaths: [''], allNames: [''], type: '', path: '', name: '', count: 0, isDir: false });
 const processPage = reactive({ open: false });
 
 const createRef = ref();
@@ -395,6 +573,8 @@ const favoriteRef = ref();
 const hoveredRowIndex = ref(-1);
 const favorites = ref([]);
 const batchRoleRef = ref();
+const dialogVscodeOpenRef = ref();
+const previewRef = ref();
 
 // editablePath
 const { searchableStatus, searchablePath, searchableInputRef, searchableInputBlur } = useSearchable(paths);
@@ -409,6 +589,34 @@ const paginationConfig = reactive({
 const mobile = computed(() => {
     return globalStore.isMobile();
 });
+
+const handleFilePatch = (command: string) => {
+    switch (command) {
+        case 'openUpload':
+            openUpload();
+            break;
+        case 'openWget':
+            openWget();
+            break;
+        case 'openMove:copy':
+            openMove('copy');
+            break;
+        case 'openMove:cut':
+            openMove('cut');
+            break;
+        case 'openCompress':
+            openCompress(selects.value);
+            break;
+        case 'openBatchRole':
+            openBatchRole(selects.value);
+            break;
+        case 'batchDelFiles':
+            batchDelFiles();
+            break;
+        default:
+            break;
+    }
+};
 
 const search = async () => {
     loading.value = true;
@@ -461,10 +669,9 @@ const open = async (row: File.File) => {
             url: req.path,
             name: name,
         });
-
         jump(req.path);
     } else {
-        openCodeEditor(row.path, row.extension);
+        openView(row);
     }
 };
 
@@ -491,7 +698,23 @@ const handlePath = () => {
     }
 };
 
+const right = () => {
+    if (pointer < history.length - 1) {
+        pointer++;
+        let url = history[pointer];
+        backForwardJump(url);
+    }
+};
+
 const back = () => {
+    if (pointer > 0) {
+        pointer--;
+        let url = history[pointer];
+        backForwardJump(url);
+    }
+};
+
+const top = () => {
     if (paths.value.length > 0) {
         let url = '/';
         if (paths.value.length >= 2) {
@@ -502,7 +725,30 @@ const back = () => {
 };
 
 const jump = async (url: string) => {
-    const oldUrl = req.path;
+    history.splice(pointer + 1);
+    history.push(url);
+    pointer = history.length - 1;
+
+    const { path: oldUrl, pageSize: oldPageSize } = req;
+    Object.assign(req, initData(), { path: url, containSub: false, search: '', pageSize: oldPageSize });
+    let searchResult = await searchFile();
+    // check search result,the file is exists?
+    if (!searchResult.data.path) {
+        req.path = oldUrl;
+        globalStore.setLastFilePath(req.path);
+        MsgWarning(i18n.global.t('commons.res.notFound'));
+        return;
+    }
+    req.path = searchResult.data.path;
+    globalStore.setLastFilePath(req.path);
+    handleSearchResult(searchResult);
+    getPaths(req.path);
+    nextTick(function () {
+        handlePath();
+    });
+};
+
+const backForwardJump = async (url: string) => {
     const oldPageSize = req.pageSize;
     // reset search params before exec jump
     Object.assign(req, initData());
@@ -511,14 +757,6 @@ const jump = async (url: string) => {
     req.search = '';
     req.pageSize = oldPageSize;
     let searchResult = await searchFile();
-
-    globalStore.setLastFilePath(req.path);
-    // check search result,the file is exists?
-    if (!searchResult.data.path) {
-        req.path = oldUrl;
-        MsgWarning(i18n.global.t('commons.res.notFound'));
-        return;
-    }
     handleSearchResult(searchResult);
     getPaths(req.path);
     nextTick(function () {
@@ -570,7 +808,7 @@ const getDirSize = async (row: any, index: number) => {
     const req = {
         path: row.path,
     };
-    loading.value = true;
+    btnLoading.value.push(index);
     await ComputeDirSize(req)
         .then(async (res) => {
             let newData = [...data.value];
@@ -578,7 +816,7 @@ const getDirSize = async (row: any, index: number) => {
             data.value = newData;
         })
         .finally(() => {
-            loading.value = false;
+            btnLoading.value = btnLoading.value.filter((item) => item !== index);
         });
 };
 
@@ -624,6 +862,35 @@ const openDeCompress = (item: File.File) => {
     deCompressRef.value.acceptParams(fileDeCompress);
 };
 
+const openView = (item: File.File) => {
+    const fileType = getFileType(item.extension);
+
+    const previewTypes = ['image', 'video', 'audio', 'word', 'excel'];
+    if (previewTypes.includes(fileType)) {
+        return openPreview(item, fileType);
+    }
+
+    const actionMap = {
+        compress: openDeCompress,
+        text: () => openCodeEditor(item.path, item.extension),
+    };
+    const path = item.isSymlink ? item.linkPath : item.path;
+    return actionMap[fileType] ? actionMap[fileType](item) : openCodeEditor(path, item.extension);
+};
+
+const openPreview = (item: File.File, fileType: string) => {
+    if (item.mode.toString() == '-' && item.user == '-' && item.group == '-') {
+        MsgWarning(i18n.global.t('file.fileCanNotRead'));
+        return;
+    }
+    filePreview.path = item.isSymlink ? item.linkPath : item.path;
+    filePreview.name = item.name;
+    filePreview.extension = item.extension;
+    filePreview.fileType = fileType;
+
+    previewRef.value.acceptParams(filePreview);
+};
+
 const openCodeEditor = (path: string, extension: string) => {
     codeReq.path = path;
     codeReq.expand = true;
@@ -642,6 +909,7 @@ const openCodeEditor = (path: string, extension: string) => {
             fileEdit.content = res.data.content;
             fileEdit.path = res.data.path;
             fileEdit.name = res.data.name;
+            fileEdit.extension = res.data.extension;
 
             codeEditorRef.value.acceptParams(fileEdit);
         })
@@ -693,14 +961,23 @@ const openRename = (item: File.File) => {
 const openMove = (type: string) => {
     fileMove.type = type;
     fileMove.name = '';
-    const oldpaths = [];
+    fileMove.allNames = [];
+    fileMove.isDir = false;
+    const oldPaths = [];
     for (const s of selects.value) {
-        oldpaths.push(s['path']);
+        oldPaths.push(s['path']);
     }
     fileMove.count = selects.value.length;
-    fileMove.oldPaths = oldpaths;
+    fileMove.oldPaths = oldPaths;
     if (selects.value.length == 1) {
         fileMove.name = selects.value[0].name;
+        fileMove.isDir = selects.value[0].isDir;
+    } else {
+        const allNames = [];
+        for (const s of selects.value) {
+            allNames.push(s['name']);
+        }
+        fileMove.allNames = allNames;
     }
     moveOpen.value = true;
 };
@@ -711,6 +988,7 @@ const closeMove = () => {
     fileMove.oldPaths = [];
     fileMove.name = '';
     fileMove.count = 0;
+    fileMove.isDir = false;
     moveOpen.value = false;
 };
 
@@ -782,15 +1060,20 @@ const getFavoriates = async () => {
 const toFavorite = (row: File.Favorite) => {
     if (row.isDir) {
         jump(row.path);
-    } else if (row.isTxt) {
-        openCodeEditor(row.path, '.' + row.name.split('.').pop());
     } else {
-        jump(row.path.substring(0, row.path.lastIndexOf('/')));
+        let file = {} as File.File;
+        file.path = row.path;
+        file.extension = '.' + row.name.split('.').pop();
+        openView(file);
     }
 };
 
 const toTerminal = () => {
     router.push({ path: '/hosts/terminal', query: { path: req.path } });
+};
+
+const openWithVSCode = (row: File.File) => {
+    dialogVscodeOpenRef.value.acceptParams({ path: row.path + (row.isDir ? '' : ':1:1') });
 };
 
 const buttons = [
@@ -811,12 +1094,14 @@ const buttons = [
         label: i18n.global.t('file.deCompress'),
         click: openDeCompress,
         disabled: (row: File.File) => {
-            return row.isDir;
+            return !isDecompressFile(row);
         },
     },
     {
-        label: i18n.global.t('file.mode'),
-        click: openMode,
+        label: i18n.global.t('file.editPermissions'),
+        click: (row: File.File) => {
+            openBatchRole([row]);
+        },
     },
     {
         label: i18n.global.t('file.compress'),
@@ -833,6 +1118,10 @@ const buttons = [
         click: copyDir,
     },
     {
+        label: i18n.global.t('file.openWithVscode'),
+        click: openWithVSCode,
+    },
+    {
         label: i18n.global.t('commons.button.delete'),
         disabled: (row: File.File) => {
             return row.name == '.1panel_clash';
@@ -844,6 +1133,20 @@ const buttons = [
         click: openDetail,
     },
 ];
+
+const isDecompressFile = (row: File.File) => {
+    if (row.isDir) {
+        return false;
+    }
+    if (getFileType(row.extension) === 'compress') {
+        return true;
+    }
+    if (row.mimeType == 'application/octet-stream') {
+        return false;
+    } else {
+        return Mimetypes.get(row.mimeType) != undefined;
+    }
+};
 
 onMounted(() => {
     if (router.currentRoute.value.query.path) {
@@ -858,7 +1161,8 @@ onMounted(() => {
     }
     pathWidth.value = pathRef.value.offsetWidth;
     search();
-
+    history.push(req.path);
+    pointer = history.length - 1;
     nextTick(function () {
         handlePath();
     });
@@ -912,6 +1216,7 @@ onMounted(() => {
 .right-section {
     display: flex;
     align-items: center;
+    gap: 1rem;
 }
 
 .left-section > *:not(:first-child) {
@@ -947,5 +1252,8 @@ onMounted(() => {
     .arrow {
         color: #726e6e;
     }
+}
+.search-button {
+    width: 20vw;
 }
 </style>

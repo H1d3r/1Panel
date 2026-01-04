@@ -6,6 +6,7 @@ export namespace Backup {
         type: string;
         accessKey: string;
         bucket: string;
+        bucketInput: boolean;
         credential: string;
         backupPath: string;
         vars: string;
@@ -39,6 +40,11 @@ export namespace Backup {
         fileDir: string;
         fileName: string;
     }
+    export interface BackupFile {
+        id: number;
+        name: string;
+        size: number;
+    }
     export interface ForBucket {
         type: string;
         accessKey: string;
@@ -57,6 +63,7 @@ export namespace Backup {
         type: string;
         name: string;
         detailName: string;
+        secret: string;
     }
     export interface Recover {
         source: string;
@@ -64,5 +71,6 @@ export namespace Backup {
         name: string;
         detailName: string;
         file: string;
+        secret: string;
     }
 }

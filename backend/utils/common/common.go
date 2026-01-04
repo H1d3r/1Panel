@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"sort"
@@ -15,6 +16,9 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/1Panel-dev/1Panel/backend/buserr"
+	"github.com/gin-gonic/gin"
 
 	"golang.org/x/net/idna"
 
@@ -49,8 +53,8 @@ func ComparePanelVersion(version1, version2 string) bool {
 	if version1 == version2 {
 		return false
 	}
-	version1s := strings.Split(version1, ".")
-	version2s := strings.Split(version2, ".")
+	version1s := SplitStr(version1, ".", "-")
+	version2s := SplitStr(version2, ".", "-")
 
 	if len(version2s) > len(version1s) {
 		for i := 0; i < len(version2s)-len(version1s); i++ {
@@ -68,7 +72,15 @@ func ComparePanelVersion(version1, version2 string) bool {
 		if version1s[i] == version2s[i] {
 			continue
 		} else {
-			return version1s[i] > version2s[i]
+			v1, err1 := strconv.Atoi(version1s[i])
+			if err1 != nil {
+				return version1s[i] > version2s[i]
+			}
+			v2, err2 := strconv.Atoi(version2s[i])
+			if err2 != nil {
+				return version1s[i] > version2s[i]
+			}
+			return v1 > v2
 		}
 	}
 	return true
@@ -114,6 +126,9 @@ func GetSortedVersions(versions []string) []string {
 }
 
 func CopyFile(src, dst string) error {
+	if fi, err := os.Stat(src); err == nil && fi.IsDir() {
+		return fmt.Errorf("src is a directory, use CopyDirs instead")
+	}
 	source, err := os.Open(src)
 	if err != nil {
 		return err
@@ -142,7 +157,57 @@ func CopyFile(src, dst string) error {
 	}
 	return nil
 }
+func CopyDirs(srcDir, dstDir string) error {
+	srcInfo, err := os.Stat(srcDir)
+	if err != nil {
+		return err
+	}
+	if !srcInfo.IsDir() {
+		return fmt.Errorf("%s is not a directory", srcDir)
+	}
+	if err := os.MkdirAll(dstDir, srcInfo.Mode()); err != nil {
+		return err
+	}
+	return filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		relPath, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+		dstPath := filepath.Join(dstDir, relPath)
+		if info.IsDir() {
+			return os.MkdirAll(dstPath, info.Mode())
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return copySymlink(path, dstPath)
+		}
+		return CopyFile(path, dstPath)
+	})
+}
 
+func copySymlink(src, dst string) error {
+	link, err := os.Readlink(src)
+	if err != nil {
+		return err
+	}
+	return os.Symlink(link, dst)
+}
+func Copy(src, dst string) error {
+	fi, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	switch mode := fi.Mode(); {
+	case mode.IsDir():
+		return CopyDirs(src, dst)
+	case mode.IsRegular():
+		return CopyFile(src, dst)
+	default:
+		return fmt.Errorf("unsupported file type: %s", mode)
+	}
+}
 func IsCrossVersion(version1, version2 string) bool {
 	version1s := strings.Split(version1, ".")
 	version2s := strings.Split(version2, ".")
@@ -222,13 +287,17 @@ func RemoveRepeatElement(a interface{}) (ret []interface{}) {
 }
 
 func LoadSizeUnit(value float64) string {
-	if value > 1048576 {
-		return fmt.Sprintf("%vM", value/1048576)
+	val := int64(value)
+	if val%1024 != 0 {
+		return fmt.Sprintf("%v", val)
 	}
-	if value > 1024 {
-		return fmt.Sprintf("%vK", value/1024)
+	if val > 1048576 {
+		return fmt.Sprintf("%vM", val/1048576)
 	}
-	return fmt.Sprintf("%v", value)
+	if val > 1024 {
+		return fmt.Sprintf("%vK", val/1024)
+	}
+	return fmt.Sprintf("%v", val)
 }
 
 func LoadSizeUnit2F(value float64) string {
@@ -244,13 +313,6 @@ func LoadSizeUnit2F(value float64) string {
 	return fmt.Sprintf("%.2f", value)
 }
 
-func LoadTimeZone() string {
-	loc := time.Now().Location()
-	if _, err := time.LoadLocation(loc.String()); err != nil {
-		return "Asia/Shanghai"
-	}
-	return loc.String()
-}
 func LoadTimeZoneByCmd() string {
 	loc := time.Now().Location().String()
 	if _, err := time.LoadLocation(loc); err != nil {
@@ -295,4 +357,88 @@ func PunycodeEncode(text string) (string, error) {
 		return "", err
 	}
 	return ascii, nil
+}
+
+func SplitStr(str string, spi ...string) []string {
+	lists := []string{str}
+	var results []string
+	for _, s := range spi {
+		results = []string{}
+		for _, list := range lists {
+			results = append(results, strings.Split(list, s)...)
+		}
+		lists = results
+	}
+	return results
+}
+
+func IsValidIP(ip string) bool {
+	return net.ParseIP(ip) != nil
+}
+
+const (
+	b  = uint64(1)
+	kb = 1024 * b
+	mb = 1024 * kb
+	gb = 1024 * mb
+)
+
+func FormatBytes(bytes uint64) string {
+	switch {
+	case bytes < kb:
+		return fmt.Sprintf("%dB", bytes)
+	case bytes < mb:
+		return fmt.Sprintf("%.2fKB", float64(bytes)/float64(kb))
+	case bytes < gb:
+		return fmt.Sprintf("%.2fMB", float64(bytes)/float64(mb))
+	default:
+		return fmt.Sprintf("%.2fGB", float64(bytes)/float64(gb))
+	}
+}
+
+func FormatPercent(percent float64) string {
+	return fmt.Sprintf("%.2f%%", percent)
+}
+
+func GetLang(c *gin.Context) string {
+	lang := c.GetHeader("Accept-Language")
+	if lang == "" {
+		lang = "en"
+	}
+	return lang
+}
+
+func HandleIPList(content string) ([]string, error) {
+	ipList := strings.Split(content, "\n")
+	var res []string
+	for _, ip := range ipList {
+		if ip == "" {
+			continue
+		}
+		if net.ParseIP(ip) != nil {
+			res = append(res, ip)
+			continue
+		}
+		if _, _, err := net.ParseCIDR(ip); err != nil {
+			return nil, buserr.New("ErrParseIP")
+		}
+		res = append(res, ip)
+	}
+	return res, nil
+}
+
+func GetRealClientIP(c *gin.Context) string {
+	addr := c.Request.RemoteAddr
+	if ip, _, err := net.SplitHostPort(addr); err == nil {
+		return ip
+	}
+	return addr
+}
+
+func IsPrivateIP(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	return ip.IsPrivate() || ip.IsLoopback()
 }

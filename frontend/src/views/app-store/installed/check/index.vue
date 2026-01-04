@@ -1,5 +1,5 @@
 <template>
-    <el-dialog v-model="open" :title="$t('app.checkTitle')" width="50%" :close-on-click-modal="false">
+    <el-dialog v-model="open" :title="$t('app.checkTitle')" width="40%" :close-on-click-modal="false">
         <el-row>
             <el-col :span="20" :offset="2" v-if="open">
                 <el-alert
@@ -9,11 +9,18 @@
                     show-icon
                     :closable="false"
                 />
-                <br />
-                <el-descriptions border :column="1">
-                    <el-descriptions-item v-for="(item, key) in map" :key="key">
+                <el-descriptions :column="1" border class="mt-5">
+                    <el-descriptions-item
+                        v-for="(item, key) in map"
+                        :key="key"
+                        label-class-name="check-label"
+                        class-name="check-content"
+                        min-width="60px"
+                    >
                         <template #label>
-                            <a href="javascript:void(0);" @click="toPage(item[0])">{{ $t('app.' + item[0]) }}</a>
+                            <a href="javascript:void(0);" class="check-label-a" @click="toPage(item[0])">
+                                {{ $t('app.' + item[0]) }}
+                            </a>
                         </template>
                         <span class="resources">
                             {{ map.get(item[0]).toString() }}
@@ -48,12 +55,12 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 const router = useRouter();
 
-interface CheckRrops {
+interface CheckProps {
     items: App.AppInstallResource[];
     installID: Number;
     key: string;
 }
-const installData = ref<CheckRrops>({
+const installData = ref<CheckProps>({
     items: [],
     installID: 0,
     key: '',
@@ -63,7 +70,7 @@ const map = new Map();
 const forceDelete = ref(false);
 const em = defineEmits(['close']);
 
-const acceptParams = (props: CheckRrops) => {
+const acceptParams = (props: CheckProps) => {
     map.clear();
     forceDelete.value = false;
     installData.value.installID = props.installID;

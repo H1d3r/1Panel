@@ -1,9 +1,15 @@
 <template>
-    <el-drawer v-model="dialogVisible" :destroy-on-close="true" :close-on-click-modal="false" size="30%">
+    <el-drawer
+        v-model="dialogVisible"
+        :destroy-on-close="true"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+        size="30%"
+    >
         <template #header>
             <DrawerHeader :header="$t('database.databaseConnInfo')" :back="handleClose" />
         </template>
-        <el-form @submit.prevent v-loading="loading" ref="formRef" :model="form" label-position="top">
+        <el-form @submit.prevent v-loading="loading" ref="formRef" :rules="rules" :model="form" label-position="top">
             <el-row type="flex" justify="center">
                 <el-col :span="22">
                     <el-form-item :label="$t('database.containerConn')" v-if="form.from === 'local'">
@@ -23,8 +29,8 @@
                                     <CopyButton :content="loadPgInfo(true)" type="icon" />
                                 </el-descriptions-item>
                                 <el-descriptions-item :label="$t('database.connPort')">
-                                    {{ form.port }}
-                                    <CopyButton :content="form.port + ''" type="icon" />
+                                    5432
+                                    <CopyButton content="5432" type="icon" />
                                 </el-descriptions-item>
                             </el-descriptions>
                         </el-card>
@@ -62,7 +68,13 @@
                     <el-divider border-style="dashed" />
                     <div v-if="form.from === 'local'">
                         <el-form-item :label="$t('commons.login.username')" prop="username">
-                            <el-input type="text" readonly disabled v-model="form.username">
+                            <el-input
+                                type="text"
+                                style="width: calc(100% - 60px)"
+                                readonly
+                                disabled
+                                v-model="form.username"
+                            >
                                 <template #append>
                                     <el-button-group>
                                         <CopyButton :content="form.username" />
@@ -70,19 +82,21 @@
                                 </template>
                             </el-input>
                         </el-form-item>
-                        <el-form-item
-                            :label="$t('commons.login.password')"
-                            :rules="Rules.paramComplexity"
-                            prop="password"
-                        >
-                            <el-input type="password" show-password clearable v-model="form.password">
-                                <template #append>
-                                    <CopyButton :content="form.password" />
-                                    <el-button @click="random" class="p-ml-5">
-                                        {{ $t('commons.button.random') }}
-                                    </el-button>
-                                </template>
-                            </el-input>
+                        <el-form-item :label="$t('commons.login.password')" prop="password">
+                            <el-input
+                                style="width: calc(100% - 205px)"
+                                type="password"
+                                show-password
+                                clearable
+                                v-model="form.password"
+                            />
+                            <el-button-group>
+                                <CopyButton class="copy_button" :content="form.password" />
+                                <el-button @click="random">
+                                    {{ $t('commons.button.random') }}
+                                </el-button>
+                            </el-button-group>
+                            <span class="input-help">{{ $t('commons.rule.illegalChar') }}</span>
                         </el-form-item>
                     </div>
                     <div v-if="form.from !== 'local'">
@@ -99,14 +113,12 @@
             </el-row>
         </el-form>
 
-        <ConfirmDialog ref="confirmDialogRef" @confirm="onSubmit" @cancel="loadPassword"></ConfirmDialog>
-
         <template #footer>
             <span class="dialog-footer">
                 <el-button :disabled="loading" @click="dialogVisible = false">
                     {{ $t('commons.button.cancel') }}
                 </el-button>
-                <el-button :disabled="loading" type="primary" @click="onSave(formRef)">
+                <el-button :disabled="loading || form.status !== 'Running'" type="primary" @click="onSave(formRef)">
                     {{ $t('commons.button.confirm') }}
                 </el-button>
             </span>
@@ -120,7 +132,6 @@ import { Rules } from '@/global/form-rules';
 import i18n from '@/lang';
 import { ElForm } from 'element-plus';
 import { getDatabase, updatePostgresqlPassword } from '@/api/modules/database';
-import ConfirmDialog from '@/components/confirm-dialog/index.vue';
 import { GetAppConnInfo } from '@/api/modules/app';
 import DrawerHeader from '@/components/drawer-header/index.vue';
 import { MsgSuccess } from '@/utils/message';
@@ -131,6 +142,7 @@ const loading = ref(false);
 
 const dialogVisible = ref(false);
 const form = reactive({
+    status: '',
     systemIP: '',
     password: '',
     containerName: '',
@@ -145,7 +157,9 @@ const form = reactive({
     remoteIP: '',
 });
 
-const confirmDialogRef = ref();
+const rules = reactive({
+    password: [Rules.requiredInput, Rules.noSpace, Rules.illegal],
+});
 
 type FormInstance = InstanceType<typeof ElForm>;
 const formRef = ref<FormInstance>();
@@ -196,6 +210,7 @@ const loadSystemIP = async () => {
 const loadPassword = async () => {
     if (form.from === 'local') {
         const res = await GetAppConnInfo(form.type, form.database);
+        form.status = res.data.status;
         form.username = res.data.username || '';
         form.password = res.data.password || '';
         form.port = res.data.port || 5432;
@@ -212,36 +227,36 @@ const loadPassword = async () => {
     form.remoteIP = res.data.address;
 };
 
-const onSubmit = async () => {
-    let param = {
-        id: 0,
-        from: form.from,
-        type: form.type,
-        database: form.database,
-        value: form.password,
-    };
-    loading.value = true;
-    await updatePostgresqlPassword(param)
-        .then(() => {
-            loading.value = false;
-            MsgSuccess(i18n.global.t('commons.msg.operationSuccess'));
-            dialogVisible.value = false;
-        })
-        .catch(() => {
-            loading.value = false;
-        });
-};
-
 const onSave = async (formEl: FormInstance | undefined) => {
     if (!formEl) return;
     formEl.validate(async (valid) => {
         if (!valid) return;
-        let params = {
-            header: i18n.global.t('database.confChange'),
-            operationInfo: i18n.global.t('database.restartNowHelper'),
-            submitInputInfo: i18n.global.t('database.restartNow'),
-        };
-        confirmDialogRef.value!.acceptParams(params);
+        ElMessageBox.confirm(
+            i18n.global.t('database.changeConnHelper', [i18n.global.t('commons.login.password')]),
+            i18n.global.t('commons.msg.infoTitle'),
+            {
+                confirmButtonText: i18n.global.t('commons.button.confirm'),
+                cancelButtonText: i18n.global.t('commons.button.cancel'),
+            },
+        ).then(async () => {
+            let param = {
+                id: 0,
+                from: form.from,
+                type: form.type,
+                database: form.database,
+                value: form.password,
+            };
+            loading.value = true;
+            await updatePostgresqlPassword(param)
+                .then(() => {
+                    loading.value = false;
+                    MsgSuccess(i18n.global.t('commons.msg.operationSuccess'));
+                    dialogVisible.value = false;
+                })
+                .catch(() => {
+                    loading.value = false;
+                });
+        });
     });
 };
 
@@ -249,3 +264,14 @@ defineExpose({
     acceptParams,
 });
 </script>
+
+<style lang="scss" scoped>
+.copy_button {
+    border-radius: 0px;
+    border-left-width: 0px;
+}
+:deep(.el-input__wrapper) {
+    border-top-right-radius: 0px;
+    border-bottom-right-radius: 0px;
+}
+</style>

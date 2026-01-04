@@ -1,7 +1,7 @@
 import { Layout } from '@/routers/constant';
 
 const databaseRouter = {
-    sort: 4,
+    sort: 5,
     path: '/databases',
     component: Layout,
     redirect: '/databases/mysql',
@@ -83,6 +83,16 @@ const databaseRouter = {
                     path: 'redis',
                     name: 'Redis',
                     component: () => import('@/views/database/redis/index.vue'),
+                    hidden: true,
+                    meta: {
+                        activeMenu: '/databases',
+                        requiresAuth: false,
+                    },
+                },
+                {
+                    path: 'redis/remote',
+                    name: 'Redis-Remote',
+                    component: () => import('@/views/database/redis/remote/index.vue'),
                     hidden: true,
                     meta: {
                         activeMenu: '/databases',

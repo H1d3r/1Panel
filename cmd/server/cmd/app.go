@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/1Panel-dev/1Panel/backend/i18n"
 	"github.com/1Panel-dev/1Panel/backend/utils/files"
 	"github.com/1Panel-dev/1Panel/cmd/server/app"
 	"github.com/pkg/errors"
@@ -17,23 +18,31 @@ var (
 )
 
 func init() {
-	initCmd.Flags().StringVarP(&appKey, "key", "k", "", "应用的key（仅支持英文）")
-	initCmd.Flags().StringVarP(&appVersion, "version", "v", "", "应用版本")
+	appCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
+		i18n.UseI18nForCmd(language)
+		loadAppHelper()
+	})
+	initCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
+		i18n.UseI18nForCmd(language)
+		loadAppInitHelper()
+	})
+
+	initCmd.Flags().StringVarP(&appKey, "key", "k", "", "")
+	initCmd.Flags().StringVarP(&appVersion, "version", "v", "", "")
 	appCmd.AddCommand(initCmd)
 	RootCmd.AddCommand(appCmd)
 }
 
 var appCmd = &cobra.Command{
-	Use:   "app",
-	Short: "应用相关命令",
+	Use: "app",
 }
 
 var initCmd = &cobra.Command{
-	Use:   "init",
-	Short: "初始化应用",
+	Use: "init",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		i18n.UseI18nForCmd(language)
 		if !isRoot() {
-			fmt.Println("请使用 sudo 1pctl app init 或者切换到 root 用户")
+			fmt.Println(i18n.GetMsgWithMapForCmd("SudoHelper", map[string]interface{}{"cmd": "sudo 1pctl app init"}))
 			return nil
 		}
 		if len(args) > 0 {
@@ -43,11 +52,11 @@ var initCmd = &cobra.Command{
 			}
 		}
 		if appKey == "" {
-			fmt.Println("应用的 key 缺失，使用 -k 指定")
+			fmt.Println(i18n.GetMsgByKeyForCmd("AppMissKey"))
 			return nil
 		}
 		if appVersion == "" {
-			fmt.Println("应用版本缺失，使用 -v 指定")
+			fmt.Println(i18n.GetMsgByKeyForCmd("AppMissVersion"))
 			return nil
 		}
 		fileOp := files.NewFileOp()
@@ -75,7 +84,7 @@ var initCmd = &cobra.Command{
 		}
 		versionPath := fmt.Sprintf("%s/%s", appKeyPath, appVersion)
 		if fileOp.Stat(versionPath) {
-			return errors.New("版本已存在！")
+			return errors.New(i18n.GetMsgByKeyForCmd("AppVersionExist"))
 		}
 		if err := createFolder(fileOp, versionPath); err != nil {
 			return err
@@ -91,7 +100,7 @@ var initCmd = &cobra.Command{
 		if err := createFile(fileOp, dockerComposeYamlPath); err != nil {
 			return err
 		}
-		fmt.Println("创建成功！")
+		fmt.Println(i18n.GetMsgByKeyForCmd("AppCreateSuccessful"))
 		return nil
 	},
 }
@@ -101,7 +110,7 @@ func createFile(fileOp files.FileOp, filePath string) error {
 		return nil
 	}
 	if err := fileOp.CreateFile(filePath); err != nil {
-		fmt.Printf("文件 %s 创建失败 %v", filePath, err)
+		fmt.Println(i18n.GetMsgWithMapForCmd("AppCreateFileErr", map[string]interface{}{"name": filePath, "err": err.Error()}))
 		return err
 	}
 	return nil
@@ -112,7 +121,7 @@ func createFolder(fileOp files.FileOp, dirPath string) error {
 		return nil
 	}
 	if err := fileOp.CreateDir(dirPath, 0755); err != nil {
-		fmt.Printf("文件夹 %s 创建失败 %v", dirPath, err)
+		fmt.Println(i18n.GetMsgWithMapForCmd("AppCreateDirErr", map[string]interface{}{"name": dirPath, "err": err.Error()}))
 		return err
 	}
 	return nil
@@ -120,8 +129,26 @@ func createFolder(fileOp files.FileOp, dirPath string) error {
 
 func writeFile(fileOp files.FileOp, filePath string, in io.Reader) error {
 	if err := fileOp.WriteFile(filePath, in, 0755); err != nil {
-		fmt.Printf("文件 %s 写入失败 %v", filePath, err)
+		fmt.Println(i18n.GetMsgWithMapForCmd("AppWriteErr", map[string]interface{}{"name": filePath, "err": err.Error()}))
 		return err
 	}
 	return nil
+}
+
+func loadAppHelper() {
+	fmt.Println(i18n.GetMsgByKeyForCmd("AppCommands"))
+	fmt.Println("\nUsage:\n  1panel app [command]\n\nAvailable Commands:")
+	fmt.Println("\n  init        " + i18n.GetMsgByKeyForCmd("AppInit"))
+	fmt.Println("\nFlags:\n  -h, --help             help for app")
+	fmt.Println("  -k, --key string       " + i18n.GetMsgByKeyForCmd("AppKeyVal"))
+	fmt.Println("  -v, --version string   " + i18n.GetMsgByKeyForCmd("AppVersion"))
+	fmt.Println("\nUse \"1panel app [command] --help\" for more information about a command.")
+}
+
+func loadAppInitHelper() {
+	fmt.Println(i18n.GetMsgByKeyForCmd("AppInit"))
+	fmt.Println("\nUsage:\n  1panel app init [flags]")
+	fmt.Println("\nFlags:\n  -h, --help             help for app")
+	fmt.Println("  -k, --key string       " + i18n.GetMsgByKeyForCmd("AppKeyVal"))
+	fmt.Println("  -v, --version string   " + i18n.GetMsgByKeyForCmd("AppVersion"))
 }

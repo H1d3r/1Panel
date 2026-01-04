@@ -11,8 +11,10 @@ import (
 
 	"github.com/1Panel-dev/1Panel/backend/app/dto"
 	"github.com/1Panel-dev/1Panel/backend/constant"
+	"github.com/1Panel-dev/1Panel/backend/global"
 	"github.com/1Panel-dev/1Panel/backend/utils/cmd"
 	"github.com/1Panel-dev/1Panel/backend/utils/docker"
+	"github.com/1Panel-dev/1Panel/backend/utils/systemctl"
 	"github.com/pkg/errors"
 )
 
@@ -55,6 +57,7 @@ func (u *DockerService) LoadDockerStatus() string {
 	if err != nil {
 		return constant.Stopped
 	}
+	defer client.Close()
 	if _, err := client.Ping(context.Background()); err != nil {
 		return constant.Stopped
 	}
@@ -72,6 +75,7 @@ func (u *DockerService) LoadDockerConf() *dto.DaemonJsonConf {
 	if err != nil {
 		data.Status = constant.Stopped
 	} else {
+		defer client.Close()
 		if _, err := client.Ping(ctx); err != nil {
 			data.Status = constant.Stopped
 		}
@@ -102,7 +106,6 @@ func (u *DockerService) LoadDockerConf() *dto.DaemonJsonConf {
 		return &data
 	}
 	if err := json.Unmarshal(arr, &conf); err != nil {
-		fmt.Println(err)
 		return &data
 	}
 	if _, ok := daemonMap["iptables"]; !ok {
@@ -129,13 +132,10 @@ func (u *DockerService) LoadDockerConf() *dto.DaemonJsonConf {
 }
 
 func (u *DockerService) UpdateConf(req dto.SettingUpdate) error {
-	if _, err := os.Stat(constant.DaemonJsonPath); err != nil && os.IsNotExist(err) {
-		if err = os.MkdirAll(path.Dir(constant.DaemonJsonPath), os.ModePerm); err != nil {
-			return err
-		}
-		_, _ = os.Create(constant.DaemonJsonPath)
+	err := createIfNotExistDaemonJsonFile()
+	if err != nil {
+		return err
 	}
-
 	file, err := os.ReadFile(constant.DaemonJsonPath)
 	if err != nil {
 		return err
@@ -198,9 +198,29 @@ func (u *DockerService) UpdateConf(req dto.SettingUpdate) error {
 				daemonMap["exec-opts"] = []string{"native.cgroupdriver=systemd"}
 			}
 		}
+	case "http-proxy", "https-proxy":
+		delete(daemonMap, "proxies")
+		if len(req.Value) > 0 {
+			proxies := map[string]interface{}{
+				req.Key: req.Value,
+			}
+			daemonMap["proxies"] = proxies
+		}
+	case "socks5-proxy", "close-proxy":
+		delete(daemonMap, "proxies")
+		if len(req.Value) > 0 {
+			proxies := map[string]interface{}{
+				"http-proxy":  req.Value,
+				"https-proxy": req.Value,
+			}
+			daemonMap["proxies"] = proxies
+		}
 	}
 	if len(daemonMap) == 0 {
 		_ = os.Remove(constant.DaemonJsonPath)
+		if err := restartDocker(); err != nil {
+			return err
+		}
 		return nil
 	}
 	newJson, err := json.MarshalIndent(daemonMap, "", "\t")
@@ -210,22 +230,35 @@ func (u *DockerService) UpdateConf(req dto.SettingUpdate) error {
 	if err := os.WriteFile(constant.DaemonJsonPath, newJson, 0640); err != nil {
 		return err
 	}
+	if err := validateDockerConfig(); err != nil {
+		return err
+	}
 
-	stdout, err := cmd.Exec("systemctl restart docker")
-	if err != nil {
-		return errors.New(string(stdout))
+	if err := restartDocker(); err != nil {
+		return err
+	}
+	return nil
+}
+func createIfNotExistDaemonJsonFile() error {
+	if _, err := os.Stat(constant.DaemonJsonPath); err != nil && os.IsNotExist(err) {
+		if err = os.MkdirAll(path.Dir(constant.DaemonJsonPath), os.ModePerm); err != nil {
+			return err
+		}
+		var daemonFile *os.File
+		daemonFile, err = os.Create(constant.DaemonJsonPath)
+		if err != nil {
+			return err
+		}
+		defer daemonFile.Close()
 	}
 	return nil
 }
 
 func (u *DockerService) UpdateLogOption(req dto.LogOption) error {
-	if _, err := os.Stat(constant.DaemonJsonPath); err != nil && os.IsNotExist(err) {
-		if err = os.MkdirAll(path.Dir(constant.DaemonJsonPath), os.ModePerm); err != nil {
-			return err
-		}
-		_, _ = os.Create(constant.DaemonJsonPath)
+	err := createIfNotExistDaemonJsonFile()
+	if err != nil {
+		return err
 	}
-
 	file, err := os.ReadFile(constant.DaemonJsonPath)
 	if err != nil {
 		return err
@@ -246,19 +279,20 @@ func (u *DockerService) UpdateLogOption(req dto.LogOption) error {
 		return err
 	}
 
-	stdout, err := cmd.Exec("systemctl restart docker")
-	if err != nil {
-		return errors.New(string(stdout))
+	if err := validateDockerConfig(); err != nil {
+		return err
+	}
+
+	if err := restartDocker(); err != nil {
+		return err
 	}
 	return nil
 }
 
 func (u *DockerService) UpdateIpv6Option(req dto.Ipv6Option) error {
-	if _, err := os.Stat(constant.DaemonJsonPath); err != nil && os.IsNotExist(err) {
-		if err = os.MkdirAll(path.Dir(constant.DaemonJsonPath), os.ModePerm); err != nil {
-			return err
-		}
-		_, _ = os.Create(constant.DaemonJsonPath)
+	err := createIfNotExistDaemonJsonFile()
+	if err != nil {
+		return err
 	}
 
 	file, err := os.ReadFile(constant.DaemonJsonPath)
@@ -288,9 +322,12 @@ func (u *DockerService) UpdateIpv6Option(req dto.Ipv6Option) error {
 		return err
 	}
 
-	stdout, err := cmd.Exec("systemctl restart docker")
-	if err != nil {
-		return errors.New(string(stdout))
+	if err := validateDockerConfig(); err != nil {
+		return err
+	}
+
+	if err := restartDocker(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -298,13 +335,14 @@ func (u *DockerService) UpdateIpv6Option(req dto.Ipv6Option) error {
 func (u *DockerService) UpdateConfByFile(req dto.DaemonJsonUpdateByFile) error {
 	if len(req.File) == 0 {
 		_ = os.Remove(constant.DaemonJsonPath)
-		return nil
-	}
-	if _, err := os.Stat(constant.DaemonJsonPath); err != nil && os.IsNotExist(err) {
-		if err = os.MkdirAll(path.Dir(constant.DaemonJsonPath), os.ModePerm); err != nil {
+		if err := restartDocker(); err != nil {
 			return err
 		}
-		_, _ = os.Create(constant.DaemonJsonPath)
+		return nil
+	}
+	err := createIfNotExistDaemonJsonFile()
+	if err != nil {
+		return err
 	}
 	file, err := os.OpenFile(constant.DaemonJsonPath, os.O_WRONLY|os.O_TRUNC, 0640)
 	if err != nil {
@@ -315,25 +353,54 @@ func (u *DockerService) UpdateConfByFile(req dto.DaemonJsonUpdateByFile) error {
 	_, _ = write.WriteString(req.File)
 	write.Flush()
 
-	stdout, err := cmd.Exec("systemctl restart docker")
-	if err != nil {
-		return errors.New(string(stdout))
+	if err := validateDockerConfig(); err != nil {
+		return err
+	}
+
+	if err := restartDocker(); err != nil {
+		return err
 	}
 	return nil
 }
 
 func (u *DockerService) OperateDocker(req dto.DockerOperation) error {
 	service := "docker"
-	if req.Operation == "stop" {
-		service = "docker.socket"
-	}
-	stdout, err := cmd.Execf("systemctl %s %s ", req.Operation, service)
+	h, err := systemctl.DefaultHandler(service)
 	if err != nil {
-		return errors.New(string(stdout))
+		return err
+	}
+	if req.Operation == "stop" {
+		socketHandle, err := systemctl.DefaultHandler("docker.socket")
+		if err == nil {
+			status, err := socketHandle.IsActive()
+			if err == nil && status.IsActive {
+				if std, err := socketHandle.ExecuteAction("stop"); err != nil {
+					global.LOG.Errorf("handle stop docker.socket failed, err: %v", std)
+				}
+			}
+		}
+	}
+
+	if req.Operation == "restart" {
+		if err := validateDockerConfig(); err != nil {
+			return err
+		}
+	}
+
+	if isDockerSnapInstalled() {
+		command := fmt.Sprintf("snap %s docker", req.Operation)
+		stdout, err := cmd.Exec(command)
+		if err != nil {
+			return fmt.Errorf("failed to restart docker: %v", stdout)
+		}
+		return nil
+	}
+	result, err := h.ExecuteAction(req.Operation)
+	if err != nil {
+		return errors.New(result.Output)
 	}
 	return nil
 }
-
 func changeLogOption(daemonMap map[string]interface{}, logMaxFile, logMaxSize string) {
 	if opts, ok := daemonMap["log-opts"]; ok {
 		if len(logMaxFile) != 0 || len(logMaxSize) != 0 {
@@ -381,4 +448,38 @@ func changeLogOption(daemonMap map[string]interface{}, logMaxFile, logMaxSize st
 			daemonMap["log-opts"] = optsMap
 		}
 	}
+}
+
+func validateDockerConfig() error {
+	if !cmd.Which("dockerd") {
+		return nil
+	}
+	stdout, err := cmd.Exec("dockerd --validate")
+	if strings.Contains(stdout, "unknown flag: --validate") {
+		return nil
+	}
+	if err != nil || (stdout != "" && strings.TrimSpace(stdout) != "configuration OK") {
+		return fmt.Errorf("docker configuration validation failed, err: %v", stdout)
+	}
+	return nil
+}
+
+func isDockerSnapInstalled() bool {
+	stdout, err := cmd.Exec("which docker")
+	if err != nil {
+		return false
+	}
+	stdout = strings.TrimSpace(stdout)
+	return strings.Contains(stdout, "snap")
+}
+
+func restartDocker() error {
+	if isDockerSnapInstalled() {
+		stdout, err := cmd.Exec("snap restart docker")
+		if err != nil {
+			return fmt.Errorf("failed to restart docker: %v", stdout)
+		}
+		return nil
+	}
+	return systemctl.Restart("docker")
 }

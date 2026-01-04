@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/1Panel-dev/1Panel/backend/constant"
+
 	"github.com/1Panel-dev/1Panel/backend/buserr"
 
 	"github.com/1Panel-dev/1Panel/backend/app/dto"
@@ -24,7 +26,7 @@ func (u *BackupService) MysqlBackup(req dto.CommonBackup) error {
 		return err
 	}
 
-	timeNow := time.Now().Format("20060102150405")
+	timeNow := time.Now().Format(constant.DateTimeSlimLayout)
 	itemDir := fmt.Sprintf("database/%s/%s/%s", req.Type, req.Name, req.DetailName)
 	targetDir := path.Join(localDir, itemDir)
 	fileName := fmt.Sprintf("%s_%s.sql.gz", req.DetailName, timeNow+common.RandStrAndNum(5))
@@ -59,14 +61,14 @@ func (u *BackupService) MysqlRecoverByUpload(req dto.CommonRecover) error {
 	file := req.File
 	fileName := path.Base(req.File)
 	if strings.HasSuffix(fileName, ".tar.gz") {
-		fileNameItem := time.Now().Format("20060102150405")
+		fileNameItem := time.Now().Format(constant.DateTimeSlimLayout)
 		dstDir := fmt.Sprintf("%s/%s", path.Dir(req.File), fileNameItem)
 		if _, err := os.Stat(dstDir); err != nil && os.IsNotExist(err) {
 			if err = os.MkdirAll(dstDir, os.ModePerm); err != nil {
 				return fmt.Errorf("mkdir %s failed, err: %v", dstDir, err)
 			}
 		}
-		if err := handleUnTar(req.File, dstDir); err != nil {
+		if err := handleUnTar(req.File, dstDir, ""); err != nil {
 			_ = os.RemoveAll(dstDir)
 			return err
 		}
@@ -142,7 +144,7 @@ func handleMysqlRecover(req dto.CommonRecover, isRollback bool) error {
 	}
 
 	if !isRollback {
-		rollbackFile := path.Join(global.CONF.System.TmpDir, fmt.Sprintf("database/%s/%s_%s.sql.gz", req.Type, req.DetailName, time.Now().Format("20060102150405")))
+		rollbackFile := path.Join(global.CONF.System.TmpDir, fmt.Sprintf("database/%s/%s_%s.sql.gz", req.Type, req.DetailName, time.Now().Format(constant.DateTimeSlimLayout)))
 		if err := cli.Backup(client.BackupInfo{
 			Name:      req.DetailName,
 			Type:      req.Type,
@@ -168,8 +170,9 @@ func handleMysqlRecover(req dto.CommonRecover, isRollback bool) error {
 					Timeout: 300,
 				}); err != nil {
 					global.LOG.Errorf("rollback mysql db %s from %s failed, err: %v", req.DetailName, rollbackFile, err)
+				} else {
+					global.LOG.Infof("rollback mysql db %s from %s successful", req.DetailName, rollbackFile)
 				}
-				global.LOG.Infof("rollback mysql db %s from %s successful", req.DetailName, rollbackFile)
 				_ = os.RemoveAll(rollbackFile)
 			} else {
 				_ = os.RemoveAll(rollbackFile)
@@ -185,6 +188,7 @@ func handleMysqlRecover(req dto.CommonRecover, isRollback bool) error {
 
 		Timeout: 300,
 	}); err != nil {
+		global.LOG.Errorf("recover mysql db %s from %s failed, err: %v", req.DetailName, req.File, err)
 		return err
 	}
 	isOk = true

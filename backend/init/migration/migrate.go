@@ -81,6 +81,36 @@ func Init() {
 		migrations.AddNoAuthSetting,
 		migrations.UpdateXpackHideMenu,
 		migrations.AddMenuTabsSetting,
+		migrations.AddDeveloperSetting,
+
+		migrations.AddWebsiteSSLColumn,
+		migrations.AddRedisCommand,
+		migrations.AddMonitorMenu,
+		migrations.AddFtp,
+		migrations.AddProxy,
+		migrations.AddCronJobColumn,
+		migrations.AddForward,
+		migrations.AddShellColumn,
+		migrations.AddClam,
+		migrations.AddClamStatus,
+		migrations.AddAlertMenu,
+		migrations.AddComposeColumn,
+
+		migrations.AddAutoRestart,
+		migrations.AddApiInterfaceConfig,
+		migrations.AddApiKeyValidityTime,
+
+		migrations.UpdateAppTag,
+		migrations.UpdateApp,
+		migrations.AddOllamaModel,
+		migrations.AddAppMenu,
+		migrations.AddAppPanelName,
+		migrations.AddLicenseVerify,
+
+		migrations.AddMcpServer,
+		migrations.AddPbootCMSPHPExtensions,
+		migrations.DeleteV2Openresty,
+		migrations.UpdateOnedrive,
 	})
 	if err := m.Migrate(); err != nil {
 		global.LOG.Error(err)

@@ -1,7 +1,13 @@
 <template>
-    <el-drawer v-model="open" :close-on-click-modal="false" size="40%" :before-close="handleClose">
+    <el-drawer
+        v-model="open"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+        size="40%"
+        :before-close="handleClose"
+    >
         <template #header>
-            <DrawerHeader :header="$t('website.' + proxy.operate + 'Proxy')" :back="handleClose" />
+            <DrawerHeader :header="$t('commons.button.' + proxy.operate)" :back="handleClose" />
         </template>
         <el-row v-loading="loading">
             <el-col :span="22" :offset="1">
@@ -21,6 +27,13 @@
                     <el-form-item :label="$t('website.enableCache')" prop="cache">
                         <el-switch v-model="proxy.cache" @change="changeCache(proxy.cache)"></el-switch>
                     </el-form-item>
+                    <el-form-item :label="$t('website.sni')" prop="sni">
+                        <el-switch v-model="proxy.sni"></el-switch>
+                        <span class="input-help">{{ $t('website.sniHelper') }}</span>
+                    </el-form-item>
+                    <el-form-item label="proxy_ssl_name" prop="proxySSLName" v-if="proxy.sni">
+                        <el-input v-model.trim="proxy.proxySSLName"></el-input>
+                    </el-form-item>
                     <el-form-item :label="$t('website.cacheTime')" prop="cacheTime" v-if="proxy.cache">
                         <el-input v-model.number="proxy.cacheTime" maxlength="15">
                             <template #append>
@@ -37,7 +50,7 @@
                     </el-form-item>
                     <el-row :gutter="10">
                         <el-col :span="12">
-                            <el-form-item :label="$t('website.proxyPass')" prop="proxyPass">
+                            <el-form-item :label="$t('website.proxyPass')" prop="proxyAddress">
                                 <el-input
                                     v-model.trim="proxy.proxyAddress"
                                     :placeholder="$t('website.proxyHelper')"
@@ -126,10 +139,10 @@ const proxyForm = ref<FormInstance>();
 const rules = ref({
     name: [Rules.requiredInput, Rules.appName],
     match: [Rules.requiredInput],
-    modifier: [Rules.requiredInput],
     cacheTime: [Rules.requiredInput, checkNumberRange(1, 65535)],
     proxyPass: [Rules.requiredInput],
     proxyHost: [Rules.requiredInput],
+    proxyAddress: [Rules.requiredInput],
 });
 const open = ref(false);
 const loading = ref(false);
@@ -150,6 +163,8 @@ const initData = (): Website.ProxyConfig => ({
     replaces: {},
     proxyAddress: '',
     proxyProtocol: 'http://',
+    sni: false,
+    proxySSLName: '$proxy_host',
 });
 let proxy = ref(initData());
 const replaces = ref<any>([]);

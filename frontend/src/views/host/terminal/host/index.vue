@@ -1,23 +1,23 @@
 <template>
     <div>
-        <LayoutContent v-loading="loading" :title="$t('terminal.host')">
+        <LayoutContent v-loading="loading" :title="$t('terminal.host', 2)">
             <template #toolbar>
-                <el-row>
-                    <el-col :span="20">
+                <div class="flex w-full flex-col gap-4 md:justify-between md:flex-row">
+                    <div class="flex flex-wrap gap-4">
                         <el-button type="primary" @click="onOpenDialog('create')">
                             {{ $t('terminal.addHost') }}
                         </el-button>
                         <el-button type="primary" plain @click="onOpenGroupDialog()">
-                            {{ $t('terminal.group') }}
+                            {{ $t('terminal.manageGroup') }}
                         </el-button>
                         <el-button type="primary" plain :disabled="selects.length === 0" @click="onBatchDelete(null)">
                             {{ $t('commons.button.delete') }}
                         </el-button>
-                    </el-col>
-                    <el-col :span="4">
+                    </div>
+                    <div class="flex flex-wrap gap-3">
                         <TableSearch @search="search()" v-model:searchName="info" />
-                    </el-col>
-                </el-row>
+                    </div>
+                </div>
             </template>
             <template #search>
                 <el-select v-model="group" @change="search()" clearable class="p-w-200">

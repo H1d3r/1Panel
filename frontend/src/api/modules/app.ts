@@ -40,7 +40,7 @@ export const ChangePort = (params: App.ChangePort) => {
 };
 
 export const SearchAppInstalled = (search: App.AppInstallSearch) => {
-    return http.post<ResPage<App.AppInstalled>>('apps/installed/search', search);
+    return http.post<ResPage<App.AppInstallDto>>('apps/installed/search', search);
 };
 
 export const ListAppInstalled = () => {
@@ -64,7 +64,7 @@ export const AppInstalledDeleteCheck = (appInstallId: number) => {
 };
 
 export const GetAppInstalled = (search: App.AppInstalledSearch) => {
-    return http.post<App.AppInstalled[]>('apps/installed/search', search);
+    return http.post<ResPage<App.AppInstalled>>('apps/installed/search', search);
 };
 
 export const InstalledOp = (op: App.AppInstalledOp) => {
@@ -79,8 +79,8 @@ export const GetAppService = (key: string | undefined) => {
     return http.get<App.AppService[]>(`apps/services/${key}`);
 };
 
-export const GetAppUpdateVersions = (id: number) => {
-    return http.get<any>(`apps/installed/${id}/versions`);
+export const GetAppUpdateVersions = (req: App.AppUpdateVersionReq) => {
+    return http.post<any>(`apps/installed/update/versions`, req);
 };
 
 export const GetAppDefaultConfig = (key: string, name: string) => {

@@ -1,5 +1,5 @@
 <template>
-    <el-drawer :close-on-click-modal="false" v-model="open" size="60%">
+    <el-drawer :close-on-click-modal="false" :close-on-press-escape="false" v-model="open" size="60%">
         <template #header>
             <DrawerHeader :header="$t('website.acmeAccountManage')" :back="handleClose" />
         </template>
@@ -8,7 +8,7 @@
         </div>
         <ComplexTable :data="data" :pagination-config="paginationConfig" @search="search()" v-loading="loading">
             <template #toolbar>
-                <el-button type="primary" @click="openCreate">{{ $t('website.addAccount') }}</el-button>
+                <el-button type="primary" @click="openCreate">{{ $t('commons.button.create') }}</el-button>
             </template>
             <el-table-column
                 :label="$t('website.email')"

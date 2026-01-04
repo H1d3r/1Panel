@@ -2,74 +2,73 @@
     <div>
         <div class="app-status" v-if="data.isExist">
             <el-card>
-                <div class="flex items-center">
-                    <div>
+                <div class="flex w-full flex-col gap-4 md:flex-row">
+                    <div class="flex flex-wrap gap-4">
                         <el-tag effect="dark" type="success">{{ data.app }}</el-tag>
+                        <Status :key="refresh" :status="data.status"></Status>
+                        <el-tag>{{ $t('app.version') }}{{ $t('commons.colon') }}{{ data.version }}</el-tag>
                     </div>
-                    <div>
-                        <Status class="status-content" :key="refresh" :status="data.status"></Status>
-                    </div>
-                    <div>
-                        <el-tag class="status-content">{{ $t('app.version') }}:{{ data.version }}</el-tag>
-                    </div>
-                    <div>
-                        <span class="buttons">
-                            <el-button
-                                type="primary"
-                                v-if="data.status != 'Running'"
-                                link
-                                @click="onOperate('start')"
-                                :disabled="data.status === 'Installing'"
-                            >
-                                {{ $t('app.start') }}
-                            </el-button>
-                            <el-button type="primary" v-if="data.status === 'Running'" link @click="onOperate('stop')">
-                                {{ $t('app.stop') }}
-                            </el-button>
-                            <el-divider direction="vertical" />
-                            <el-button
-                                type="primary"
-                                link
-                                :disabled="data.status === 'Installing'"
-                                @click="onOperate('restart')"
-                            >
-                                {{ $t('app.restart') }}
-                            </el-button>
-                            <el-divider direction="vertical" />
-                            <el-button
-                                type="primary"
-                                link
-                                v-if="data.app === 'OpenResty'"
-                                @click="onOperate('reload')"
-                                :disabled="data.status !== 'Running'"
-                            >
-                                {{ $t('app.reload') }}
-                            </el-button>
-                            <el-divider v-if="data.app === 'OpenResty'" direction="vertical" />
-                            <el-button
-                                type="primary"
-                                @click="setting"
-                                link
-                                :disabled="
-                                    data.status === 'Installing' ||
-                                    (data.status !== 'Running' && data.app === 'OpenResty')
-                                "
-                            >
-                                {{ $t('commons.button.set') }}
-                            </el-button>
-                            <el-divider v-if="data.app === 'OpenResty'" direction="vertical" />
-                            <el-button
-                                v-if="data.app === 'OpenResty'"
-                                type="primary"
-                                @click="clear"
-                                link
-                                :disabled="
-                                    data.status === 'Installing' ||
-                                    (data.status !== 'Running' && data.app === 'OpenResty')
-                                "
-                            >
-                                {{ $t('nginx.clearProxyCache') }}
-                            </el-button>
+
+                    <div class="mt-0.5">
+                        <el-button
+                            type="primary"
+                            v-if="data.status != 'Running'"
+                            link
+                            @click="onOperate('start')"
+                            :disabled="data.status === 'Installing'"
+                        >
+                            {{ $t('app.start') }}
+                        </el-button>
+                        <el-button type="primary" v-if="data.status === 'Running'" link @click="onOperate('stop')">
+                            {{ $t('app.stop') }}
+                        </el-button>
+                        <el-divider direction="vertical" />
+                        <el-button
+                            type="primary"
+                            link
+                            :disabled="data.status === 'Installing'"
+                            @click="onOperate('restart')"
+                        >
+                            {{ $t('app.restart') }}
+                        </el-button>
+                        <el-divider v-if="!hideSetting" direction="vertical" />
+                        <el-button
+                            type="primary"
+                            link
+                            v-if="data.app === 'OpenResty'"
+                            @click="onOperate('reload')"
+                            :disabled="data.status !== 'Running'"
+                        >
+                            {{ $t('app.reload') }}
+                        </el-button>
+                        <el-divider v-if="data.app === 'OpenResty'" direction="vertical" />
+                        <el-button
+                            v-if="!hideSetting"
+                            type="primary"
+                            @click="setting"
+                            link
+                            :disabled="
+                                data.status === 'Installing' || (data.status !== 'Running' && data.app === 'OpenResty')
+                            "
+                        >
+                            {{ $t('commons.button.set') }}
+                        </el-button>
+                        <el-divider v-if="data.app === 'OpenResty'" direction="vertical" />
+                        <el-button
+                            v-if="data.app === 'OpenResty'"
+                            type="primary"
+                            @click="clear"
+                            link
+                            :disabled="
+                                data.status === 'Installing' || (data.status !== 'Running' && data.app === 'OpenResty')
+                            "
+                        >
+                            {{ $t('nginx.clearProxyCache') }}
+                        </el-button>
+
+                        <el-divider direction="vertical" v-if="slots.extra" />
+                        <span v-if="slots.extra">
+                            <slot name="extra"></slot>
                         </span>
                     </div>
 
@@ -82,9 +81,10 @@
                             <el-alert
                                 :title="$t('app.checkTitle')"
                                 :closable="false"
+                                center
                                 type="warning"
                                 show-icon
-                                class="h-8"
+                                class="h-6 check-title"
                             />
                         </el-tooltip>
                     </div>
@@ -95,10 +95,10 @@
             <LayoutContent :title="getTitle(key)" :divider="true">
                 <template #main>
                     <div class="app-warn">
-                        <div class="flx-center">
-                            <span>{{ $t('app.checkInstalledWarn', [data.app]) }}</span>
-                            <span @click="goRouter(key)" class="flx-align-center">
-                                <el-icon class="ml-2"><Position /></el-icon>
+                        <div class="flex flex-col gap-2 items-center justify-center w-full sm:flex-row">
+                            <div>{{ $t('app.checkInstalledWarn', [data.app]) }}</div>
+                            <span @click="goRouter(key)" class="flex items-center justify-center gap-0.5">
+                                <el-icon><Position /></el-icon>
                                 {{ $t('database.goInstall') }}
                             </span>
                         </div>
@@ -114,12 +114,13 @@
 <script lang="ts" setup>
 import { CheckAppInstalled, InstalledOp } from '@/api/modules/app';
 import router from '@/routers';
-import { onMounted, reactive, ref, watch } from 'vue';
+import { onMounted, reactive, ref, useSlots } from 'vue';
 import Status from '@/components/status/index.vue';
 import { ElMessageBox } from 'element-plus';
 import i18n from '@/lang';
 import { MsgSuccess } from '@/utils/message';
 import { ClearNginxCache } from '@/api/modules/nginx';
+const slots = useSlots();
 
 const props = defineProps({
     appKey: {
@@ -130,22 +131,11 @@ const props = defineProps({
         type: String,
         default: '',
     },
+    hideSetting: {
+        type: Boolean,
+        default: false,
+    },
 });
-
-watch(
-    () => props.appKey,
-    (val) => {
-        key.value = val;
-        onCheck();
-    },
-);
-watch(
-    () => props.appName,
-    (val) => {
-        name.value = val;
-        onCheck();
-    },
-);
 
 let key = ref('');
 let name = ref('');
@@ -167,7 +157,15 @@ let refresh = ref(1);
 const httpPort = ref(0);
 const httpsPort = ref(0);
 
-const em = defineEmits(['setting', 'isExist', 'before', 'update:loading', 'update:maskShow']);
+const em = defineEmits([
+    'setting',
+    'isExist',
+    'before',
+    'after',
+    'update:loading',
+    'update:maskShow',
+    'update:appInstallID',
+]);
 const setting = () => {
     em('setting', false);
 };
@@ -180,12 +178,14 @@ const isDB = () => {
     return key.value === 'mysql' || key.value === 'mariadb' || key.value === 'postgresql';
 };
 
-const onCheck = async () => {
-    await CheckAppInstalled(key.value, name.value)
+const onCheck = async (key: any, name: any) => {
+    await CheckAppInstalled(key, name)
         .then((res) => {
             data.value = res.data;
             em('isExist', res.data);
+            em('update:maskShow', res.data.status !== 'Running');
             operateReq.installId = res.data.appInstallId;
+            em('update:appInstallID', res.data.appInstallId);
             httpPort.value = res.data.httpPort;
             httpsPort.value = res.data.httpsPort;
             refresh.value++;
@@ -207,52 +207,57 @@ const clear = () => {
 };
 
 const onOperate = async (operation: string) => {
-    em('update:maskShow', false);
     operateReq.operate = operation;
-    ElMessageBox.confirm(
-        i18n.global.t('app.operatorHelper', [i18n.global.t('app.' + operation)]),
-        i18n.global.t('app.' + operation),
-        {
-            confirmButtonText: i18n.global.t('commons.button.confirm'),
-            cancelButtonText: i18n.global.t('commons.button.cancel'),
-            type: 'info',
-        },
-    )
-        .then(() => {
-            em('update:maskShow', true);
-            em('update:loading', true);
-            em('before');
-            InstalledOp(operateReq)
-                .then(() => {
-                    em('update:loading', false);
-                    MsgSuccess(i18n.global.t('commons.msg.operationSuccess'));
-                    onCheck();
-                })
-                .catch(() => {
-                    em('update:loading', false);
-                });
-        })
-        .catch(() => {
-            em('update:maskShow', true);
-        });
+    ElMessageBox.confirm(i18n.global.t(`app.${operation}OperatorHelper`), i18n.global.t('app.' + operation), {
+        confirmButtonText: i18n.global.t('commons.button.confirm'),
+        cancelButtonText: i18n.global.t('commons.button.cancel'),
+        type: 'info',
+    }).then(() => {
+        em('update:maskShow', true);
+        em('update:loading', true);
+        em('before');
+        InstalledOp(operateReq)
+            .then(() => {
+                em('update:loading', false);
+                MsgSuccess(i18n.global.t('commons.msg.operationSuccess'));
+                onCheck(key.value, name.value);
+                em('after');
+            })
+            .catch(() => {
+                em('update:loading', false);
+            });
+    });
 };
 
 const getTitle = (key: string) => {
     switch (key) {
         case 'openresty':
-            return i18n.global.t('website.website');
+            return i18n.global.t('website.website', 2);
         case 'mysql':
-            return 'MySQL ' + i18n.global.t('menu.database');
+            return 'MySQL ' + i18n.global.t('menu.database').toLowerCase();
         case 'postgresql':
-            return 'PostgreSQL ' + i18n.global.t('menu.database');
+            return 'PostgreSQL ' + i18n.global.t('menu.database').toLowerCase();
         case 'redis':
-            return 'Redis ' + i18n.global.t('menu.database');
+            return 'Redis ' + i18n.global.t('menu.database').toLowerCase();
     }
 };
 
 onMounted(() => {
     key.value = props.appKey;
     name.value = props.appName;
-    onCheck();
+    onCheck(key.value, name.value);
+});
+
+defineExpose({
+    onCheck,
 });
 </script>
+<style scoped lang="scss">
+.check-title {
+    color: var(--el-color-warning);
+    border: 1px solid var(--el-color-warning);
+    background-color: transparent;
+    padding: 8px 8px;
+    max-width: 100px;
+}
+</style>

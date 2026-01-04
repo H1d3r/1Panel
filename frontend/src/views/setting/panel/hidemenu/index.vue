@@ -1,6 +1,12 @@
 <template>
     <div>
-        <el-drawer v-model="drawerVisible" :destroy-on-close="true" :close-on-click-modal="false" size="30%">
+        <el-drawer
+            v-model="drawerVisible"
+            :destroy-on-close="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            size="30%"
+        >
             <template #header>
                 <DrawerHeader :header="$t('setting.advancedMenuHide')" :back="handleClose" />
             </template>
@@ -43,11 +49,13 @@ import { ElMessageBox } from 'element-plus';
 import i18n from '@/lang';
 import { updateMenu } from '@/api/modules/setting';
 import { MsgSuccess } from '@/utils/message';
+import { GlobalStore } from '@/store';
 
 const drawerVisible = ref();
 const loading = ref();
 const defaultCheck = ref([]);
 const emit = defineEmits<{ (e: 'search'): void }>();
+const globalStore = GlobalStore();
 interface DialogProps {
     menuList: string;
 }
@@ -75,6 +83,17 @@ function loadCheck(data: any, checkList: any) {
         }
     }
 }
+
+const removeXAlertDashboard = (data: any): any => {
+    return data
+        .filter((item: { label: string }) => item.label !== 'XAlertDashboard')
+        .map((item: { children: any }) => {
+            if (Array.isArray(item.children)) {
+                item.children = removeXAlertDashboard(item.children);
+            }
+            return item;
+        });
+};
 
 const onSaveStatus = async (row: any) => {
     if (row.label === '/xpack') {
@@ -117,6 +136,9 @@ const acceptParams = (params: DialogProps): void => {
     treeData.hideMenu = [];
     defaultCheck.value = [];
     treeData.hideMenu.push(JSON.parse(menuList.value));
+    if (globalStore.isIntl) {
+        treeData.hideMenu = removeXAlertDashboard(treeData.hideMenu);
+    }
     loadCheck(treeData.hideMenu, defaultCheck.value);
 };
 

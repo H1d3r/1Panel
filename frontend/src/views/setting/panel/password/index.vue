@@ -1,6 +1,12 @@
 <template>
     <div v-loading="loading">
-        <el-drawer v-model="passwordVisible" :destroy-on-close="true" :close-on-click-modal="false" size="30%">
+        <el-drawer
+            v-model="passwordVisible"
+            :destroy-on-close="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            size="30%"
+        >
             <template #header>
                 <DrawerHeader :header="$t('setting.changePassword')" :back="handleClose" />
             </template>
@@ -64,12 +70,8 @@ import { logOutApi } from '@/api/modules/auth';
 const globalStore = GlobalStore();
 const passFormRef = ref<FormInstance>();
 const passRules = reactive({
-    oldPassword: [Rules.noSpace, Rules.requiredInput],
-    newPassword: [
-        Rules.requiredInput,
-        Rules.noSpace,
-        { min: 6, message: i18n.global.t('commons.rule.commonPassword'), trigger: 'blur' },
-    ],
+    oldPassword: [Rules.requiredInput, Rules.noSpace],
+    newPassword: [Rules.requiredInput, Rules.noSpace],
     newPasswordComplexity: [Rules.requiredInput, Rules.noSpace, Rules.password],
     retryPassword: [Rules.requiredInput, Rules.noSpace, { validator: checkPassword, trigger: 'blur' }],
 });

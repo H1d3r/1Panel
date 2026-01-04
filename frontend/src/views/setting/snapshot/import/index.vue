@@ -1,6 +1,6 @@
 <template>
     <div>
-        <el-drawer v-model="drawerVisible" size="30%">
+        <el-drawer v-model="drawerVisible" size="30%" :close-on-click-modal="false" :close-on-press-escape="false">
             <template #header>
                 <DrawerHeader :header="$t('setting.importSnapshot')" :back="handleClose" />
             </template>
@@ -16,6 +16,10 @@
                                     :label="item.label"
                                 />
                             </el-select>
+                            <div v-if="form.from === 'LOCAL'">
+                                <span class="import-help">{{ $t('setting.importHelper') }}</span>
+                                <span @click="toFolder()" class="import-link-help">{{ backupPath }}</span>
+                            </div>
                         </el-form-item>
                         <el-form-item :label="$t('commons.table.name')" prop="names">
                             <el-select style="width: 100%" v-model="form.names" multiple clearable>
@@ -56,7 +60,9 @@ import DrawerHeader from '@/components/drawer-header/index.vue';
 import { snapshotImport } from '@/api/modules/setting';
 import { getBackupList, getFilesFromBackup } from '@/api/modules/setting';
 import { Rules } from '@/global/form-rules';
-import { MsgSuccess } from '@/utils/message';
+import { MsgError, MsgSuccess } from '@/utils/message';
+import router from '@/routers';
+import { CheckFile } from '@/api/modules/files';
 
 const drawerVisible = ref(false);
 const loading = ref();
@@ -65,6 +71,7 @@ const formRef = ref();
 const backupOptions = ref();
 const fileNames = ref();
 const existNames = ref();
+const backupPath = ref('');
 
 const form = reactive({
     from: '',
@@ -102,6 +109,14 @@ const checkDisable = (val: string) => {
     }
     return false;
 };
+const toFolder = async () => {
+    const res = await CheckFile(backupPath.value, true);
+    if (res.data) {
+        router.push({ path: '/hosts/files', query: { path: backupPath.value } });
+    } else {
+        MsgError(i18n.global.t('file.noSuchFile'));
+    }
+};
 
 const submitImport = async (formEl: FormInstance | undefined) => {
     loading.value = true;
@@ -131,6 +146,10 @@ const loadBackups = async () => {
                 if (item.id !== 0) {
                     backupOptions.value.push({ label: i18n.global.t('setting.' + item.type), value: item.type });
                 }
+                if (item.type === 'LOCAL') {
+                    item.varsJson = JSON.parse(item.vars);
+                    backupPath.value = item.varsJson['dir'] + '/system_snapshot';
+                }
             }
         })
         .catch(() => {
@@ -148,3 +167,18 @@ defineExpose({
     acceptParams,
 });
 </script>
+
+<style lang="scss" scoped>
+.import-help {
+    font-size: 12px;
+    color: #8f959e;
+}
+.import-link-help {
+    color: $primary-color;
+    cursor: pointer;
+}
+
+.import-link-help:hover {
+    opacity: 0.6;
+}
+</style>

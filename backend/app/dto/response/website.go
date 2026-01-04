@@ -2,6 +2,7 @@ package response
 
 import (
 	"github.com/1Panel-dev/1Panel/backend/app/model"
+	"time"
 )
 
 type WebsiteDTO struct {
@@ -11,6 +12,26 @@ type WebsiteDTO struct {
 	SitePath      string `json:"sitePath"`
 	AppName       string `json:"appName"`
 	RuntimeName   string `json:"runtimeName"`
+	SiteDir       string `gorm:"type:varchar;" json:"siteDir"`
+}
+
+type WebsiteRes struct {
+	ID            uint      `json:"id"`
+	CreatedAt     time.Time `json:"createdAt"`
+	Protocol      string    `json:"protocol"`
+	PrimaryDomain string    `json:"primaryDomain"`
+	Type          string    `json:"type"`
+	Alias         string    `json:"alias"`
+	Remark        string    `json:"remark"`
+	Status        string    `json:"status"`
+	ExpireDate    time.Time `json:"expireDate"`
+	SitePath      string    `json:"sitePath"`
+	AppName       string    `json:"appName"`
+	RuntimeName   string    `json:"runtimeName"`
+	SSLExpireDate time.Time `json:"sslExpireDate"`
+	SSLStatus     string    `json:"sslStatus"`
+	AppInstallID  uint      `json:"appInstallId"`
+	RuntimeType   string    `json:"runtimeType"`
 }
 
 type WebsiteOption struct {
@@ -37,6 +58,7 @@ type WebsiteHTTPS struct {
 	SSL         model.WebsiteSSL `json:"SSL"`
 	SSLProtocol []string         `json:"SSLProtocol"`
 	Algorithm   string           `json:"algorithm"`
+	Hsts        bool             `json:"hsts"`
 }
 
 type WebsiteLog struct {
@@ -61,4 +83,8 @@ type WebsiteDirConfig struct {
 	User      string   `json:"user"`
 	UserGroup string   `json:"userGroup"`
 	Msg       string   `json:"msg"`
+}
+
+type WebsiteHtmlRes struct {
+	Content string `json:"content"`
 }

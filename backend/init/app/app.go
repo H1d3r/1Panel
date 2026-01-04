@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/1Panel-dev/1Panel/backend/utils/docker"
+	"github.com/1Panel-dev/1Panel/backend/utils/firewall"
 	"path"
 
 	"github.com/1Panel-dev/1Panel/backend/constant"
@@ -22,15 +23,26 @@ func Init() {
 
 	constant.SSLLogDir = path.Join(global.CONF.System.DataDir, "log", "ssl")
 
+	constant.McpDir = path.Join(constant.DataDir, "mcp")
+
 	dirs := []string{constant.DataDir, constant.ResourceDir, constant.AppResourceDir, constant.AppInstallDir,
-		global.CONF.System.Backup, constant.RuntimeDir, constant.LocalAppResourceDir, constant.RemoteAppResourceDir, constant.SSLLogDir}
+		global.CONF.System.Backup, constant.RuntimeDir, constant.LocalAppResourceDir, constant.RemoteAppResourceDir,
+		constant.SSLLogDir, constant.McpDir}
 
 	fileOp := files.NewFileOp()
 	for _, dir := range dirs {
 		createDir(fileOp, dir)
 	}
 
-	_ = docker.CreateDefaultDockerNetwork()
+	go func() {
+		_ = docker.CreateDefaultDockerNetwork()
+
+		if f, err := firewall.NewFirewallClient(); err == nil {
+			if err = f.EnableForward(); err != nil {
+				global.LOG.Errorf("init port forward failed, err: %v", err)
+			}
+		}
+	}()
 }
 
 func createDir(fileOp files.FileOp, dirPath string) {

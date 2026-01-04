@@ -1,6 +1,12 @@
 <template>
     <div>
-        <el-drawer v-model="drawerVisible" :destroy-on-close="true" :close-on-click-modal="false" size="30%">
+        <el-drawer
+            v-model="drawerVisible"
+            :destroy-on-close="true"
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            size="30%"
+        >
             <template #header>
                 <DrawerHeader :header="$t('toolbox.device.timeZone')" :back="handleClose" />
             </template>
@@ -125,6 +131,8 @@ const onSave = async (formEl: FormInstance | undefined) => {
                 })
                 .catch(() => {
                     loading.value = false;
+                    let href = window.location.href;
+                    window.open(href, '_self');
                 });
         });
     });

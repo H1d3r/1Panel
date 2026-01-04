@@ -10,7 +10,8 @@ type FileOption struct {
 }
 
 type FileContentReq struct {
-	Path string `json:"path" validate:"required"`
+	Path     string `json:"path" validate:"required"`
+	IsDetail bool   `json:"isDetail"`
 }
 
 type SearchUploadWithPage struct {
@@ -54,12 +55,14 @@ type FileCompress struct {
 	Type    string   `json:"type" validate:"required"`
 	Name    string   `json:"name" validate:"required"`
 	Replace bool     `json:"replace"`
+	Secret  string   `json:"secret"`
 }
 
 type FileDeCompress struct {
-	Dst  string `json:"dst"  validate:"required"`
-	Type string `json:"type"  validate:"required"`
-	Path string `json:"path" validate:"required"`
+	Dst    string `json:"dst"  validate:"required"`
+	Type   string `json:"type"  validate:"required"`
+	Path   string `json:"path" validate:"required"`
+	Secret string `json:"secret"`
 }
 
 type FileEdit struct {
@@ -73,7 +76,12 @@ type FileRename struct {
 }
 
 type FilePathCheck struct {
-	Path string `json:"path" validate:"required"`
+	Path     string `json:"path" validate:"required"`
+	WithInit bool   `json:"withInit"`
+}
+
+type FilePathsCheck struct {
+	Paths []string `json:"paths" validate:"required"`
 }
 
 type FileWget struct {
@@ -84,11 +92,12 @@ type FileWget struct {
 }
 
 type FileMove struct {
-	Type     string   `json:"type" validate:"required"`
-	OldPaths []string `json:"oldPaths" validate:"required"`
-	NewPath  string   `json:"newPath" validate:"required"`
-	Name     string   `json:"name"`
-	Cover    bool     `json:"cover"`
+	Type       string   `json:"type" validate:"required"`
+	OldPaths   []string `json:"oldPaths" validate:"required"`
+	NewPath    string   `json:"newPath" validate:"required"`
+	Name       string   `json:"name"`
+	Cover      bool     `json:"cover"`
+	CoverPaths []string `json:"coverPaths"`
 }
 
 type FileDownload struct {
@@ -124,6 +133,7 @@ type FileReadByLineReq struct {
 	Type     string `json:"type" validate:"required"`
 	ID       uint   `json:"ID"`
 	Name     string `json:"name"`
+	Latest   bool   `json:"latest"`
 }
 
 type FileExistReq struct {

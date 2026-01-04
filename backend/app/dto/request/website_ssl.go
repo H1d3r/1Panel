@@ -20,6 +20,12 @@ type WebsiteSSLCreate struct {
 	Dir           string `json:"dir"`
 	ID            uint   `json:"id"`
 	Description   string `json:"description"`
+	DisableCNAME  bool   `json:"disableCNAME"`
+	SkipDNS       bool   `json:"skipDNS"`
+	Nameserver1   string `json:"nameserver1"`
+	Nameserver2   string `json:"nameserver2"`
+	ExecShell     bool   `json:"execShell"`
+	Shell         string `json:"shell"`
 }
 
 type WebsiteDNSReq struct {
@@ -32,8 +38,10 @@ type WebsiteSSLRenew struct {
 }
 
 type WebsiteSSLApply struct {
-	ID           uint `json:"ID" validate:"required"`
-	SkipDNSCheck bool `json:"SkipDNSCheck"`
+	ID           uint     `json:"ID" validate:"required"`
+	SkipDNSCheck bool     `json:"skipDNSCheck"`
+	Nameservers  []string `json:"nameservers"`
+	DisableLog   bool     `json:"disableLog"`
 }
 
 type WebsiteAcmeAccountCreate struct {
@@ -66,9 +74,24 @@ type WebsiteBatchDelReq struct {
 }
 
 type WebsiteSSLUpdate struct {
-	ID          uint   `json:"id" validate:"required"`
-	AutoRenew   bool   `json:"autoRenew"`
-	Description string `json:"description"`
+	ID            uint   `json:"id" validate:"required"`
+	AutoRenew     bool   `json:"autoRenew"`
+	Description   string `json:"description"`
+	PrimaryDomain string `json:"primaryDomain" validate:"required"`
+	OtherDomains  string `json:"otherDomains"`
+	Provider      string `json:"provider" validate:"required"`
+	AcmeAccountID uint   `json:"acmeAccountId"`
+	DnsAccountID  uint   `json:"dnsAccountId"`
+	KeyType       string `json:"keyType"`
+	Apply         bool   `json:"apply"`
+	PushDir       bool   `json:"pushDir"`
+	Dir           string `json:"dir"`
+	DisableCNAME  bool   `json:"disableCNAME"`
+	SkipDNS       bool   `json:"skipDNS"`
+	Nameserver1   string `json:"nameserver1"`
+	Nameserver2   string `json:"nameserver2"`
+	ExecShell     bool   `json:"execShell"`
+	Shell         string `json:"shell"`
 }
 
 type WebsiteSSLUpload struct {
@@ -108,6 +131,8 @@ type WebsiteCAObtain struct {
 	Renew       bool   `json:"renew"`
 	SSLID       uint   `json:"sslID"`
 	Description string `json:"description"`
+	ExecShell   bool   `json:"execShell"`
+	Shell       string `json:"shell"`
 }
 
 type WebsiteCARenew struct {

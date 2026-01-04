@@ -1,12 +1,12 @@
 import { Layout } from '@/routers/constant';
 
 const containerRouter = {
-    sort: 5,
+    sort: 6,
     path: '/containers',
     component: Layout,
     redirect: '/containers/container',
     meta: {
-        icon: 'p-docker',
+        icon: 'p-docker1',
         title: 'menu.container',
     },
     children: [

@@ -1,9 +1,13 @@
 <template>
-    <div class="not-container">
-        <img src="@/assets/images/error.svg" class="not-img" :alt="props.code" />
-        <div class="not-detail">
-            <h2>{{ props.code }}</h2>
-            <h4>{{ $t('setting.' + 'error' + props.code) }}</h4>
+    <div>
+        <div>
+            <el-row type="flex" justify="center">
+                <h1>{{ loadErrInfo() }}</h1>
+            </el-row>
+        </div>
+        <hr />
+        <div>
+            <el-row type="flex" justify="center"><span>nginx</span></el-row>
         </div>
     </div>
 </template>
@@ -12,37 +16,20 @@
 const props = defineProps({
     code: String,
 });
+const loadErrInfo = () => {
+    switch (props.code) {
+        case '400':
+            return '400 Bad Request';
+        case '401':
+            return '401 Unauthorized';
+        case '403':
+            return '403 Forbidden';
+        case '404':
+            return '404 Not Found';
+        case '408':
+            return '408 Request Timeout';
+        case '416':
+            return '416 Requested Not Satisfiable';
+    }
+};
 </script>
-
-<style scoped lang="scss">
-.not-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    .not-img {
-        margin-top: 300px;
-    }
-    .not-detail {
-        margin-top: 300px;
-        display: flex;
-        flex-direction: column;
-        h2,
-        h4 {
-            padding: 0;
-            margin: 0;
-        }
-        h2 {
-            font-size: 60px;
-            color: #434e59;
-        }
-        h4 {
-            margin: 30px 0 20px;
-            font-size: 19px;
-            font-weight: normal;
-            color: #848587;
-        }
-    }
-}
-</style>

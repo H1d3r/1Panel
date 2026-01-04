@@ -17,10 +17,10 @@ import (
 
 // @Tags Monitor
 // @Summary Load monitor datas
-// @Description 获取监控数据
 // @Param request body dto.MonitorSearch true "request"
-// @Success 200
+// @Success 200 {array} dto.MonitorData
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /hosts/monitor/search [post]
 func (b *BaseApi) LoadMonitor(c *gin.Context) {
 	var req dto.MonitorSearch
@@ -28,7 +28,7 @@ func (b *BaseApi) LoadMonitor(c *gin.Context) {
 		return
 	}
 
-	loc, _ := time.LoadLocation(common.LoadTimeZone())
+	loc, _ := time.LoadLocation(common.LoadTimeZoneByCmd())
 	req.StartTime = req.StartTime.In(loc)
 	req.EndTime = req.EndTime.In(loc)
 
@@ -89,9 +89,9 @@ func (b *BaseApi) LoadMonitor(c *gin.Context) {
 
 // @Tags Monitor
 // @Summary Clean monitor datas
-// @Description 清空监控数据
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /hosts/monitor/clean [post]
 // @x-panel-log {"bodyKeys":[],"paramKeys":[],"BeforeFunctions":[],"formatZH":"清空监控数据","formatEN":"clean monitor datas"}
 func (b *BaseApi) CleanMonitor(c *gin.Context) {

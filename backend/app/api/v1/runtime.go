@@ -10,11 +10,11 @@ import (
 
 // @Tags Runtime
 // @Summary List runtimes
-// @Description 获取运行环境列表
 // @Accept json
 // @Param request body request.RuntimeSearch true "request"
-// @Success 200
+// @Success 200 {object} dto.PageResult
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /runtimes/search [post]
 func (b *BaseApi) SearchRuntimes(c *gin.Context) {
 	var req request.RuntimeSearch
@@ -34,11 +34,11 @@ func (b *BaseApi) SearchRuntimes(c *gin.Context) {
 
 // @Tags Runtime
 // @Summary Create runtime
-// @Description 创建运行环境
 // @Accept json
 // @Param request body request.RuntimeCreate true "request"
-// @Success 200
+// @Success 200 {object} model.Runtime
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /runtimes [post]
 // @x-panel-log {"bodyKeys":["name"],"paramKeys":[],"BeforeFunctions":[],"formatZH":"创建运行环境 [name]","formatEN":"Create runtime [name]"}
 func (b *BaseApi) CreateRuntime(c *gin.Context) {
@@ -56,13 +56,13 @@ func (b *BaseApi) CreateRuntime(c *gin.Context) {
 
 // @Tags Website
 // @Summary Delete runtime
-// @Description 删除运行环境
 // @Accept json
 // @Param request body request.RuntimeDelete true "request"
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /runtimes/del [post]
-// @x-panel-log {"bodyKeys":["id"],"paramKeys":[],"BeforeFunctions":[],"formatZH":"删除网站 [name]","formatEN":"Delete website [name]"}
+// @x-panel-log {"bodyKeys":["id"],"paramKeys":[],"BeforeFunctions":[],"formatZH":"删除运行环境 [name]","formatEN":"Delete runtime [name]"}
 func (b *BaseApi) DeleteRuntime(c *gin.Context) {
 	var req request.RuntimeDelete
 	if err := helper.CheckBindAndValidate(&req, c); err != nil {
@@ -76,13 +76,27 @@ func (b *BaseApi) DeleteRuntime(c *gin.Context) {
 	helper.SuccessWithOutData(c)
 }
 
+func (b *BaseApi) DeleteRuntimeCheck(c *gin.Context) {
+	runTimeId, err := helper.GetIntParamByKey(c, "runTimeId")
+	if err != nil {
+		helper.ErrorWithDetail(c, constant.CodeErrBadRequest, constant.ErrTypeInternalServer, nil)
+		return
+	}
+	checkData, err := runtimeService.DeleteCheck(runTimeId)
+	if err != nil {
+		helper.ErrorWithDetail(c, constant.CodeErrInternalServer, constant.ErrTypeInternalServer, err)
+		return
+	}
+	helper.SuccessWithData(c, checkData)
+}
+
 // @Tags Runtime
 // @Summary Update runtime
-// @Description 更新运行环境
 // @Accept json
 // @Param request body request.RuntimeUpdate true "request"
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /runtimes/update [post]
 // @x-panel-log {"bodyKeys":["name"],"paramKeys":[],"BeforeFunctions":[],"formatZH":"更新运行环境 [name]","formatEN":"Update runtime [name]"}
 func (b *BaseApi) UpdateRuntime(c *gin.Context) {
@@ -99,12 +113,12 @@ func (b *BaseApi) UpdateRuntime(c *gin.Context) {
 
 // @Tags Runtime
 // @Summary Get runtime
-// @Description 获取运行环境
 // @Accept json
 // @Param id path string true "request"
-// @Success 200
+// @Success 200 {object} response.RuntimeDTO
 // @Security ApiKeyAuth
-// @Router /runtimes/:id [get]
+// @Security Timestamp
+// @Router /runtimes/{id} [get]
 func (b *BaseApi) GetRuntime(c *gin.Context) {
 	id, err := helper.GetIntParamByKey(c, "id")
 	if err != nil {
@@ -121,11 +135,11 @@ func (b *BaseApi) GetRuntime(c *gin.Context) {
 
 // @Tags Runtime
 // @Summary Get Node package scripts
-// @Description 获取 Node 项目的 scripts
 // @Accept json
 // @Param request body request.NodePackageReq true "request"
-// @Success 200
+// @Success 200 {array} response.PackageScripts
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /runtimes/node/package [post]
 func (b *BaseApi) GetNodePackageRunScript(c *gin.Context) {
 	var req request.NodePackageReq
@@ -142,11 +156,11 @@ func (b *BaseApi) GetNodePackageRunScript(c *gin.Context) {
 
 // @Tags Runtime
 // @Summary Operate runtime
-// @Description 操作运行环境
 // @Accept json
 // @Param request body request.RuntimeOperate true "request"
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /runtimes/operate [post]
 // @x-panel-log {"bodyKeys":["id"],"paramKeys":[],"BeforeFunctions":[],"formatZH":"操作运行环境 [name]","formatEN":"Operate runtime [name]"}
 func (b *BaseApi) OperateRuntime(c *gin.Context) {
@@ -164,11 +178,11 @@ func (b *BaseApi) OperateRuntime(c *gin.Context) {
 
 // @Tags Runtime
 // @Summary Get Node modules
-// @Description 获取 Node 项目的 modules
 // @Accept json
 // @Param request body request.NodeModuleReq true "request"
-// @Success 200
+// @Success 200 {array} response.NodeModule
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /runtimes/node/modules [post]
 func (b *BaseApi) GetNodeModules(c *gin.Context) {
 	var req request.NodeModuleReq
@@ -185,11 +199,11 @@ func (b *BaseApi) GetNodeModules(c *gin.Context) {
 
 // @Tags Runtime
 // @Summary Operate Node modules
-// @Description 操作 Node 项目 modules
 // @Accept json
 // @Param request body request.NodeModuleReq true "request"
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /runtimes/node/modules/operate [post]
 func (b *BaseApi) OperateNodeModules(c *gin.Context) {
 	var req request.NodeModuleOperateReq
@@ -206,10 +220,10 @@ func (b *BaseApi) OperateNodeModules(c *gin.Context) {
 
 // @Tags Runtime
 // @Summary Sync runtime status
-// @Description 同步运行环境状态
 // @Accept json
 // @Success 200
 // @Security ApiKeyAuth
+// @Security Timestamp
 // @Router /runtimes/sync [post]
 func (b *BaseApi) SyncStatus(c *gin.Context) {
 	err := runtimeService.SyncRuntimeStatus()

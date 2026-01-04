@@ -2,31 +2,29 @@
     <div>
         <LayoutContent :title="$t('commons.button.backup')">
             <template #main>
-                <el-form label-width="130px" :v-key="refresh">
-                    <el-row :gutter="20">
-                        <el-col :span="24">
-                            <div class="flx-justify-between">
-                                <span class="flx-align-center">
-                                    <svg-icon class="card-logo" iconName="p-file-folder"></svg-icon>
-                                    <span class="card-title">&nbsp;{{ $t('setting.LOCAL') }}</span>
-                                </span>
-                                <div style="float: right">
-                                    <el-button round @click="onOpenDialog('edit', 'LOCAL', localData)">
-                                        {{ $t('commons.button.edit') }}
-                                    </el-button>
-                                </div>
+                <el-form :v-key="refresh">
+                    <div class="flex flex-col gpa-4">
+                        <div class="flex flex-row justify-between items-center">
+                            <div class="flex gap-1 items-center">
+                                <svg-icon class="card-logo" iconName="p-file-folder"></svg-icon>
+                                <span class="card-title">&nbsp;{{ $t('setting.LOCAL') }}</span>
                             </div>
-                            <el-divider class="divider" />
-                            <div style="margin-left: 20px">
-                                <el-form-item :label="$t('setting.backupDir')">
-                                    {{ localData.varsJson['dir'] }}
-                                </el-form-item>
-                                <el-form-item :label="$t('commons.table.createdAt')">
-                                    {{ dateFormat(0, 0, localData.createdAt) }}
-                                </el-form-item>
+                            <div>
+                                <el-button round @click="onOpenDialog('edit', 'LOCAL', localData)">
+                                    {{ $t('commons.button.edit') }}
+                                </el-button>
                             </div>
-                        </el-col>
-                    </el-row>
+                        </div>
+                        <el-divider class="divider" />
+                        <div class="grid gird-cols-2 items-center ml-5">
+                            <el-form-item :label="$t('setting.backupDir')">
+                                {{ localData.varsJson['dir'] }}
+                            </el-form-item>
+                            <el-form-item :label="$t('commons.table.createdAt')">
+                                {{ dateFormat(0, 0, localData.createdAt) }}
+                            </el-form-item>
+                        </div>
+                    </div>
                 </el-form>
 
                 <div class="common-div">
@@ -35,7 +33,17 @@
 
                 <el-alert type="info" :closable="false" class="common-div">
                     <template #title>
-                        <span v-html="$t('setting.backupAlert')"></span>
+                        <span>
+                            {{ $t('setting.backupAlert') }}
+                            <el-link
+                                class="ml-1 text-xs"
+                                type="primary"
+                                target="_blank"
+                                :href="globalStore.docsUrl + '/user_manual/settings/#3'"
+                            >
+                                {{ $t('commons.button.helpDoc') }}
+                            </el-link>
+                        </span>
                     </template>
                 </el-alert>
 
@@ -60,7 +68,7 @@
                             </div>
                         </div>
                         <el-divider class="divider" />
-                        <div v-if="s3Data.id !== 0" style="margin-left: 20px">
+                        <div v-if="s3Data.id !== 0" class="ml-5">
                             <el-form-item label="Region">
                                 {{ s3Data.varsJson['region'] }}
                             </el-form-item>
@@ -94,7 +102,7 @@
                         </div>
                         <el-alert v-else center class="alert" style="height: 257px" :closable="false">
                             <el-button size="large" round plain type="primary" @click="onOpenDialog('create', 'S3')">
-                                {{ $t('setting.createBackupAccount', [$t('setting.S3')]) }}
+                                {{ $t('setting.addBackupAccount', [$t('setting.S3')]) }}
                             </el-button>
                         </el-alert>
                     </el-col>
@@ -119,7 +127,7 @@
                         </div>
 
                         <el-divider class="divider" />
-                        <div v-if="ossData.id !== 0" style="margin-left: 20px">
+                        <div v-if="ossData.id !== 0" class="ml-5">
                             <el-form-item label="Endpoint">
                                 {{ ossData.varsJson['endpoint'] }}
                             </el-form-item>
@@ -150,7 +158,7 @@
                         </div>
                         <el-alert v-else center class="alert" style="height: 257px" :closable="false">
                             <el-button size="large" round plain type="primary" @click="onOpenDialog('create', 'OSS')">
-                                {{ $t('setting.createBackupAccount', [$t('setting.OSS')]) }}
+                                {{ $t('setting.addBackupAccount', [$t('setting.OSS')]) }}
                             </el-button>
                         </el-alert>
                     </el-col>
@@ -207,7 +215,7 @@
                         </div>
                         <el-alert v-else center class="alert" style="height: 257px" :closable="false">
                             <el-button size="large" round plain type="primary" @click="onOpenDialog('create', 'COS')">
-                                {{ $t('setting.createBackupAccount', [$t('setting.COS')]) }}
+                                {{ $t('setting.addBackupAccount', [$t('setting.COS')]) }}
                             </el-button>
                         </el-alert>
                     </el-col>
@@ -269,7 +277,7 @@
                                 type="primary"
                                 @click="onOpenDialog('create', 'OneDrive')"
                             >
-                                {{ $t('setting.createBackupAccount', [$t('setting.OneDrive')]) }}
+                                {{ $t('setting.addBackupAccount', [$t('setting.OneDrive')]) }}
                             </el-button>
                         </el-alert>
                     </el-col>
@@ -313,7 +321,7 @@
                         </div>
                         <el-alert v-else center class="alert" style="height: 257px" :closable="false">
                             <el-button size="large" round plain type="primary" @click="onOpenDialog('create', 'KODO')">
-                                {{ $t('setting.createBackupAccount', [$t('setting.KODO')]) }}
+                                {{ $t('setting.addBackupAccount', [$t('setting.KODO')]) }}
                             </el-button>
                         </el-alert>
                     </el-col>
@@ -354,7 +362,7 @@
                         </div>
                         <el-alert v-else center class="alert" style="height: 257px" :closable="false">
                             <el-button size="large" round plain type="primary" @click="onOpenDialog('create', 'MINIO')">
-                                {{ $t('setting.createBackupAccount', [$t('setting.MINIO')]) }}
+                                {{ $t('setting.addBackupAccount', [$t('setting.MINIO')]) }}
                             </el-button>
                         </el-alert>
                     </el-col>
@@ -397,7 +405,7 @@
                         </div>
                         <el-alert v-else center class="alert" style="height: 257px" :closable="false">
                             <el-button size="large" round plain type="primary" @click="onOpenDialog('create', 'SFTP')">
-                                {{ $t('setting.createBackupAccount', [$t('setting.SFTP')]) }}
+                                {{ $t('setting.addBackupAccount', [$t('setting.SFTP')]) }}
                             </el-button>
                         </el-alert>
                     </el-col>
@@ -441,7 +449,7 @@
                                 type="primary"
                                 @click="onOpenDialog('create', 'WebDAV')"
                             >
-                                {{ $t('setting.createBackupAccount', ['WebDAV']) }}
+                                {{ $t('setting.addBackupAccount', ['WebDAV']) }}
                             </el-button>
                         </el-alert>
                     </el-col>
@@ -478,6 +486,9 @@ import { Backup } from '@/api/interface/backup';
 import { ElForm } from 'element-plus';
 import i18n from '@/lang';
 import { MsgSuccess } from '@/utils/message';
+import { GlobalStore } from '@/store';
+
+const globalStore = GlobalStore();
 
 const data = ref();
 const opRef = ref();
@@ -498,6 +509,7 @@ const localData = ref<Backup.BackupInfo>({
     type: 'LOCAL',
     accessKey: '',
     bucket: '',
+    bucketInput: false,
     credential: '',
     backupPath: '',
     vars: '',
@@ -511,6 +523,7 @@ const ossData = ref<Backup.BackupInfo>({
     type: 'OSS',
     accessKey: '',
     bucket: '',
+    bucketInput: false,
     credential: '',
     backupPath: '',
     vars: '',
@@ -525,6 +538,7 @@ const minioData = ref<Backup.BackupInfo>({
     type: 'MINIO',
     accessKey: '',
     bucket: '',
+    bucketInput: false,
     credential: '',
     backupPath: '',
     vars: '',
@@ -539,6 +553,7 @@ const sftpData = ref<Backup.BackupInfo>({
     type: 'SFTP',
     accessKey: '',
     bucket: '',
+    bucketInput: false,
     credential: '',
     backupPath: '',
     vars: '',
@@ -553,6 +568,7 @@ const webDAVData = ref<Backup.BackupInfo>({
     type: 'WebDAV',
     accessKey: '',
     bucket: '',
+    bucketInput: false,
     credential: '',
     backupPath: '',
     vars: '',
@@ -567,6 +583,7 @@ const oneDriveData = ref<Backup.BackupInfo>({
     type: 'OneDrive',
     accessKey: '',
     bucket: '',
+    bucketInput: false,
     credential: '',
     backupPath: '',
     vars: '',
@@ -582,6 +599,7 @@ const s3Data = ref<Backup.BackupInfo>({
     type: 'S3',
     accessKey: '',
     bucket: '',
+    bucketInput: false,
     credential: '',
     backupPath: '',
     vars: '',
@@ -597,6 +615,7 @@ const cosData = ref<Backup.BackupInfo>({
     type: 'COS',
     accessKey: '',
     bucket: '',
+    bucketInput: false,
     credential: '',
     backupPath: '',
     vars: '',
@@ -612,6 +631,7 @@ const kodoData = ref<Backup.BackupInfo>({
     type: 'KODO',
     accessKey: '',
     bucket: '',
+    bucketInput: false,
     credential: '',
     backupPath: '',
     vars: '',
@@ -736,8 +756,8 @@ onMounted(() => {
     margin: 12px 0;
     border-top: 1px var(--el-border-color) var(--el-border-style);
 }
-.alert {
-    background-color: rgba(0, 94, 235, 0.03);
+.alert-span {
+    color: var(--el-color-primary);
 }
 
 .common-div {

@@ -46,7 +46,9 @@ func NewLocation(directive IDirective) *Location {
 				location.Host = params[1]
 			}
 		case "proxy_cache":
-			location.Cache = true
+			if params[0] != "off" {
+				location.Cache = true
+			}
 		case "if":
 			if params[0] == "(" && params[1] == "$uri" && params[2] == "~*" {
 				dirs := dir.GetBlock().GetDirectives()
@@ -234,11 +236,13 @@ func (l *Location) AddSubFilter(subFilters map[string]string) {
 	}
 	l.UpdateDirective("proxy_set_header", []string{"Accept-Encoding", `""`})
 	l.UpdateDirective("sub_filter_once", []string{"off"})
+	l.UpdateDirective("sub_filter_types", []string{"*"})
 }
 
 func (l *Location) RemoveSubFilter() {
 	l.RemoveDirective("sub_filter", []string{})
 	l.RemoveDirective("proxy_set_header", []string{"Accept-Encoding", `""`})
 	l.RemoveDirective("sub_filter_once", []string{"off"})
+	l.RemoveDirective("sub_filter_types", []string{"*"})
 	l.Replaces = nil
 }

@@ -6,10 +6,10 @@
             <span>{{ $t('container.startIn') }}</span>
         </el-card>
 
-        <LayoutContent :title="$t('container.volume')" :class="{ mask: dockerStatus != 'Running' }">
+        <LayoutContent :title="$t('container.volume', 2)" :class="{ mask: dockerStatus != 'Running' }">
             <template #toolbar>
-                <el-row>
-                    <el-col :span="16">
+                <div class="flex justify-between gap-2 flex-wrap sm:flex-row">
+                    <div class="flex flex-wrap gap-3">
                         <el-button type="primary" @click="onCreate()">
                             {{ $t('container.createVolume') }}
                         </el-button>
@@ -19,12 +19,12 @@
                         <el-button :disabled="selects.length === 0" @click="batchDelete(null)">
                             {{ $t('commons.button.delete') }}
                         </el-button>
-                    </el-col>
-                    <el-col :span="8">
+                    </div>
+                    <div class="flex flex-wrap gap-3">
                         <TableSetting @search="search()" />
                         <TableSearch @search="search()" v-model:searchName="searchName" />
-                    </el-col>
-                </el-row>
+                    </div>
+                </div>
             </template>
             <template #main>
                 <ComplexTable
@@ -40,9 +40,12 @@
                         :width="mobile ? 220 : 'auto'"
                         prop="name"
                         fix
+                        show-overflow-tooltip
                     >
                         <template #default="{ row }">
-                            <Tooltip @click="onInspect(row.name)" :text="row.name" />
+                            <el-text type="primary" class="cursor-pointer" @click="onInspect(row.name)">
+                                {{ row.name }}
+                            </el-text>
                         </template>
                     </el-table-column>
                     <el-table-column :label="$t('container.volumeDir')" min-width="100">

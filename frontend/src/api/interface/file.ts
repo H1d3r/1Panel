@@ -11,7 +11,7 @@ export namespace File {
         size: number;
         isDir: boolean;
         isSymlink: boolean;
-        linkPath: boolean;
+        linkPath: string;
         type: string;
         updateTime: string;
         modTime: string;
@@ -33,6 +33,7 @@ export namespace File {
         containSub?: boolean;
         sortBy?: string;
         sortOrder?: string;
+        isDetail?: boolean;
     }
 
     export interface SearchUploadInfo extends ReqPage {
@@ -80,12 +81,14 @@ export namespace File {
         dst: string;
         name: string;
         replace: boolean;
+        secret: string;
     }
 
     export interface FileDeCompress {
         path: string;
         dst: string;
         type: string;
+        secret: string;
     }
 
     export interface FileEdit {
@@ -147,6 +150,14 @@ export namespace File {
 
     export interface FilePath {
         path: string;
+    }
+
+    export interface ExistFileInfo {
+        name: string;
+        path: string;
+        size: number;
+        uploadSize: number;
+        modTime: string;
     }
 
     export interface RecycleBin {

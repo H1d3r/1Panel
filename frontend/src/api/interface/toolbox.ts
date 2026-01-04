@@ -1,3 +1,6 @@
+import { ReqPage } from '.';
+import { Cronjob } from './cronjob';
+
 export namespace Toolbox {
     export interface DeviceBaseInfo {
         dns: Array<string>;
@@ -36,6 +39,7 @@ export namespace Toolbox {
         uploadClean: Array<CleanTree>;
         downloadClean: Array<CleanTree>;
         systemLogClean: Array<CleanTree>;
+        containerClean: Array<CleanTree>;
     }
     export interface CleanTree {
         id: string;
@@ -74,5 +78,106 @@ export namespace Toolbox {
     export interface Fail2banSet {
         ips: Array<string>;
         operate: string;
+    }
+
+    export interface FtpBaseInfo {
+        isActive: boolean;
+        isExist: boolean;
+    }
+    export interface FtpInfo {
+        id: number;
+        user: string;
+        password: string;
+        status: string;
+        path: string;
+        description: string;
+    }
+    export interface FtpCreate {
+        user: string;
+        password: string;
+        path: string;
+        description: string;
+    }
+    export interface FtpUpdate {
+        id: number;
+        password: string;
+        status: string;
+        path: string;
+        description: string;
+    }
+    export interface FtpSearchLog extends ReqPage {
+        user: string;
+        operation: string;
+    }
+    export interface FtpLog {
+        ip: string;
+        user: string;
+        time: string;
+        operation: string;
+        status: string;
+        size: string;
+    }
+
+    export interface ClamBaseInfo {
+        version: string;
+        isActive: boolean;
+        isExist: boolean;
+
+        freshVersion: string;
+        freshIsExist: boolean;
+        freshIsActive: boolean;
+    }
+    export interface ClamInfo {
+        id: number;
+        name: string;
+        status: string;
+        path: string;
+        infectedStrategy: string;
+        infectedDir: string;
+        lastHandleDate: string;
+        hasSpec: boolean;
+        spec: string;
+        specObj: Cronjob.SpecObj;
+        description: string;
+        hasAlert: boolean;
+        alertCount: number;
+        alertTitle: string;
+    }
+    export interface ClamCreate {
+        name: string;
+        path: string;
+        infectedStrategy: string;
+        infectedDir: string;
+        spec: string;
+        specObj: Cronjob.SpecObj;
+        description: string;
+    }
+    export interface ClamUpdate {
+        id: number;
+        name: string;
+        path: string;
+        infectedStrategy: string;
+        infectedDir: string;
+        spec: string;
+        specObj: Cronjob.SpecObj;
+        description: string;
+    }
+    export interface ClamSearchLog extends ReqPage {
+        clamID: number;
+        startTime: Date;
+        endTime: Date;
+    }
+    export interface ClamRecordReq {
+        tail: string;
+        clamName: string;
+        recordName: string;
+    }
+    export interface ClamLog {
+        name: string;
+        scanDate: string;
+        scanTime: string;
+        totalError: string;
+        infectedFiles: string;
+        status: string;
     }
 }

@@ -4,9 +4,9 @@
 
 <script lang="ts" setup>
 import { ref, watch, onBeforeUnmount, nextTick } from 'vue';
-import { Terminal } from 'xterm';
-import 'xterm/css/xterm.css';
-import { FitAddon } from 'xterm-addon-fit';
+import { Terminal } from '@xterm/xterm';
+import '@xterm/xterm/css/xterm.css';
+import { FitAddon } from '@xterm/addon-fit';
 import { Base64 } from 'js-base64';
 
 const terminalElement = ref<HTMLDivElement | null>(null);
@@ -47,12 +47,13 @@ const acceptParams = (props: WsProps) => {
 };
 
 const newTerm = () => {
+    const background = getComputedStyle(document.documentElement).getPropertyValue('--panel-terminal-bg-color').trim();
     term.value = new Terminal({
         lineHeight: 1.2,
         fontSize: 12,
         fontFamily: "Monaco, Menlo, Consolas, 'Courier New', monospace",
         theme: {
-            background: '#000000',
+            background: background,
         },
         cursorBlink: true,
         cursorStyle: 'underline',
@@ -84,7 +85,9 @@ function onClose(isKeepShow: boolean = false) {
             term.value.dispose();
         } catch {}
     }
-    terminalElement.value.innerHTML = '';
+    if (terminalElement.value) {
+        terminalElement.value.innerHTML = '';
+    }
 }
 
 // terminal 相关代码 start
@@ -176,12 +179,14 @@ const onWSReceive = (message: MessageEvent) => {
     switch (wsMsg.type) {
         case 'cmd': {
             term.value.element && term.value.focus();
-            let receiveMsg = Base64.decode(wsMsg.data);
-            if (initCmd.value != '') {
-                receiveMsg = receiveMsg.replace(initCmd.value.trim(), '').trim();
-                initCmd.value = '';
+            if (wsMsg.data) {
+                let receiveMsg = Base64.decode(wsMsg.data);
+                if (initCmd.value != '') {
+                    receiveMsg = receiveMsg?.replace(initCmd.value.trim(), '').trim();
+                    initCmd.value = '';
+                }
+                term.value.write(receiveMsg);
             }
-            wsMsg.data && term.value.write(receiveMsg);
             break;
         }
         case 'heartbeat': {
@@ -199,10 +204,10 @@ const errorRealTerminal = (ex: any) => {
 
 const closeRealTerminal = (ev: CloseEvent) => {
     if (heartbeatTimer.value) {
-        clearInterval(heartbeatTimer.value);
+        clearInterval(Number(heartbeatTimer.value));
     }
-    term.value.write('The connection has been disconnected.');
-    term.value.write(ev.reason);
+    term.value?.write('The connection has been disconnected.');
+    term.value?.write(ev.reason);
 };
 
 const isWsOpen = () => {
@@ -240,5 +245,8 @@ onBeforeUnmount(() => {
 #terminal {
     width: 100%;
     height: 100%;
+}
+:deep(.xterm) {
+    padding: 5px !important;
 }
 </style>

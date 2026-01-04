@@ -21,6 +21,12 @@ type BackupInfo struct {
 	Vars       string    `json:"vars"`
 }
 
+type BackupFile struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+}
+
 type OneDriveInfo struct {
 	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
@@ -35,6 +41,8 @@ type CommonBackup struct {
 	Type       string `json:"type" validate:"required,oneof=app mysql mariadb redis website postgresql"`
 	Name       string `json:"name"`
 	DetailName string `json:"detailName"`
+	Secret     string `json:"secret"`
+	FileName   string `json:"fileName"`
 }
 type CommonRecover struct {
 	Source     string `json:"source" validate:"required,oneof=OSS S3 SFTP MINIO LOCAL COS KODO OneDrive WebDAV"`
@@ -42,6 +50,7 @@ type CommonRecover struct {
 	Name       string `json:"name"`
 	DetailName string `json:"detailName"`
 	File       string `json:"file"`
+	Secret     string `json:"secret"`
 }
 
 type RecordSearch struct {
@@ -63,7 +72,6 @@ type BackupRecords struct {
 	BackupType string    `json:"backupType"`
 	FileDir    string    `json:"fileDir"`
 	FileName   string    `json:"fileName"`
-	Size       int64     `json:"size"`
 }
 
 type DownloadRecord struct {
